@@ -15,7 +15,7 @@ var FSHADER_SOURCE =
 
 'vec4 getRgbaByArg(vec2 c)                                            \n' +
 '{                                                                    \n' +
-'    float sixAngle = (atan(c.y, c.x) + M_PI)/ M_PI * 3.0;            \n' +
+'    float sixAngle = (atan(c.y, -c.x) + M_PI) / M_PI * 3.0;           \n' +
 '    if (sixAngle < 1.0) return vec4(1.0, sixAngle, 0.0, 1.0);        \n' +
 '    if (sixAngle < 2.0) return vec4(2.0 - sixAngle, 1.0, 0.0, 1.0);  \n' +
 '    if (sixAngle < 3.0) return vec4(0.0, 1.0, sixAngle - 2.0, 1.0);  \n' +
@@ -44,24 +44,36 @@ var FSHADER_SOURCE =
 '    return rFact * cFact;                                            \n' +
 '}                                                                    \n' +
 
+'vec2 cArg(vec2 z)                                                    \n' +
+'{                                                                    \n' +
+'    return vec2(atan(z.y, z.x), 0.0);                                \n' +
+'}                                                                    \n' +
+
+'vec2 cSin(vec2 z)                                                    \n' +
+'{                                                                    \n' +
+'    float eTozy = pow(M_E, z.y);                                     \n' +
+'    float eToNegzy = pow(M_E, -z.y);                                 \n' +
+'    return vec2(sin(z.x) * (eTozy + eToNegzy),                       \n' +
+'                cos(z.x) * (eTozy - eToNegzy)) / 2.0;                \n' +
+'}                                                                    \n' +
+
+
 // todos:
 // cPow
-// cSin
 // cCos
 // cTan
+// cMag
 
 'void main()                                                          \n' +
 '{                                                                    \n' +
 '    vec2 z = vec2(0.5 - gl_FragCoord.x / u_Width,                    \n' +
 '                  0.5 - gl_FragCoord.y / u_Height);                  \n' +
 '                                                                     \n' +
-'    z = cMult(vec2(1,2) - z, cDiv(cExp(13.0*z), cMult(z, z)));                                     \n' +
+'    z = cSin(8.0*z);                                                     \n' +
 '                                                                     \n' +
 '                                                                     \n' +
 '    gl_FragColor = getRgbaByArg(z);                                  \n' +
 '}                                                                    \n' +
-'                                                                     \n' +
-'                                                                     \n' +
 '                                                                     \n';
 
 function main() {
@@ -93,7 +105,7 @@ function main() {
 }
 
 function initVertexBuffers(gl) {
-    var vertices = new Float32Array([ -1.0, 1.0, 1.0, 1.0, 1.0, -1.0,   -1.0, -1.0, -1.0, 1.0, 1.0, -1.0 ]);
+    var vertices = new Float32Array([ -1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0, -1.0, 1.0, 1.0, -1.0 ]);
     var n = 6; // The number of vertices
     
     // Create a buffer object
