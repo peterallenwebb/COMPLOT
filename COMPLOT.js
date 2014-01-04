@@ -15,7 +15,10 @@ var FSHADER_SOURCE =
 
 'vec4 getRgbaByArg(vec2 c)                                            \n' +
 '{                                                                    \n' +
-'    float sixAngle = (atan(c.y, -c.x) + M_PI) / M_PI * 3.0;           \n' +
+'    if (dot(c, c) < 0.00390625) return vec4(0.0, 0.0, 0.0, 1.0);     \n' +
+'    if (dot(c, c) > 1.0 - 0.05 && dot(c, c) < 1.0 + 0.05)            \n' +
+'        return vec4(0.0, 0.0, 0.0, 1.0);                             \n' +
+'    float sixAngle = (atan(c.y, c.x) + M_PI) / M_PI * 3.0;           \n' +
 '    if (sixAngle < 1.0) return vec4(1.0, sixAngle, 0.0, 1.0);        \n' +
 '    if (sixAngle < 2.0) return vec4(2.0 - sixAngle, 1.0, 0.0, 1.0);  \n' +
 '    if (sixAngle < 3.0) return vec4(0.0, 1.0, sixAngle - 2.0, 1.0);  \n' +
@@ -57,6 +60,17 @@ var FSHADER_SOURCE =
 '                cos(z.x) * (eTozy - eToNegzy)) / 2.0;                \n' +
 '}                                                                    \n' +
 
+'vec2 cLog(vec2 z)                                                    \n' +
+'{                                                                    \n' +
+'    return vec2(log(sqrt(dot(z, z))),                                \n' +
+'                cArg(z).x);                                          \n' +
+'}                                                                    \n' +
+
+
+'vec2 cMag(vec2 z)                                                    \n' +
+'{                                                                    \n' +
+'    return vec2(sqrt(dot(z, z)), 0.0);                                \n' +
+'}                                                                    \n' +
 
 // todos:
 // cPow
@@ -66,10 +80,10 @@ var FSHADER_SOURCE =
 
 'void main()                                                          \n' +
 '{                                                                    \n' +
-'    vec2 z = vec2(0.5 - gl_FragCoord.x / u_Width,                    \n' +
+'    vec2 z = vec2(gl_FragCoord.x / u_Width - 0.5,                    \n' +
 '                  0.5 - gl_FragCoord.y / u_Height);                  \n' +
 '                                                                     \n' +
-'    z = cSin(8.0*z);                                                     \n' +
+'    z = cLog(6.0*z);                                                 \n' +
 '                                                                     \n' +
 '                                                                     \n' +
 '    gl_FragColor = getRgbaByArg(z);                                  \n' +
