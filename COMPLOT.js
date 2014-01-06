@@ -9,9 +9,10 @@ var VSHADER_SOURCE =
 var FSHADER_SOURCE =
 '#define M_PI 3.1415926535897932384626433832795                       \n' +
 '#define M_E 2.71828182845904523536028747135266                       \n' +
-'precision mediump float;                                             \n' +
+'precision highp float;                                             \n' +
 'uniform float u_Width;                                               \n' +
 'uniform float u_Height;                                              \n' +
+'uniform float u_Param1;                                              \n' +
 
 'vec4 getRgbaByArg(vec2 c)                                            \n' +
 '{                                                                    \n' +
@@ -36,8 +37,8 @@ var FSHADER_SOURCE =
 'vec2 cDiv(vec2 z1, vec2 z2)                                          \n' +
 '{                                                                    \n' +
 '    float z2Mag2 = dot(z2, z2);                                      \n' +
-'    return vec2(dot(z1, z2) / z2Mag2,                                \n' +
-'                (z1.y * z2.x - z1.x * z2.y) / z2Mag2);               \n' +
+'    return vec2(dot(z1, z2),                                         \n' +
+'                z1.y * z2.x - z1.x * z2.y) / z2Mag2;                 \n' +
 '}                                                                    \n' +
 
 'vec2 cExp(vec2 z)                                                    \n' +
@@ -66,24 +67,24 @@ var FSHADER_SOURCE =
 '                cArg(z).x);                                          \n' +
 '}                                                                    \n' +
 
-
 'vec2 cMag(vec2 z)                                                    \n' +
 '{                                                                    \n' +
-'    return vec2(sqrt(dot(z, z)), 0.0);                                \n' +
+'    return vec2(sqrt(dot(z, z)), 0.0);                               \n' +
 '}                                                                    \n' +
 
 // todos:
 // cPow
 // cCos
 // cTan
-// cMag
+// cSinh, cCosh
+// cGamma (Lanczos)
 
 'void main()                                                          \n' +
 '{                                                                    \n' +
 '    vec2 z = vec2(gl_FragCoord.x / u_Width - 0.5,                    \n' +
 '                  0.5 - gl_FragCoord.y / u_Height);                  \n' +
 '                                                                     \n' +
-'    z = cLog(6.0*z);                                                 \n' +
+'    z = cExp(cDiv(vec2(1.0, 0.0),0.1*u_Param1*z));                                                    \n' +
 '                                                                     \n' +
 '                                                                     \n' +
 '    gl_FragColor = getRgbaByArg(z);                                  \n' +
@@ -94,7 +95,9 @@ function main() {
 
     var canvas = document.getElementById('webgl');
     
-    var gl = getWebGLContext(canvas);
+    $('#param1').change(paramChange);
+    
+    gl = getWebGLContext(canvas, { antialias: true });
     if (!gl) {
         console.log('Failed to get the rendering context for WebGL');
         return;
@@ -111,16 +114,33 @@ function main() {
         return;
     }
     
-    gl.clearColor(0, 0, 0, 1);
+    draw(gl, n);
+}
+
+function paramChange(event) {
+    var newVal = $(this).val();
+    gl.uniform1f(u_Param1, newVal);
+    draw(gl);
+}
+
+var a_Position = 0;
+var u_Width = 0;
+var u_Height = 0;
+var u_Param1 = 0;
+var gl = {};
+
+function draw()
+{
+    gl.clearColor(0, 0, 0, 1.0);
     
     gl.clear(gl.COLOR_BUFFER_BIT);
     
-    gl.drawArrays(gl.TRIANGLES, 0, n);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    
 }
 
 function initVertexBuffers(gl) {
     var vertices = new Float32Array([ -1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0, -1.0, 1.0, 1.0, -1.0 ]);
-    var n = 6; // The number of vertices
     
     // Create a buffer object
     var vertexBuffer = gl.createBuffer();
@@ -135,20 +155,21 @@ function initVertexBuffers(gl) {
     gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
     
     // Pass the position of a point to a_Position variable
-    var a_Position = gl.getAttribLocation(gl.program, 'a_Position');
+    a_Position = gl.getAttribLocation(gl.program, 'a_Position');
     if (a_Position < 0) {
         console.log('Failed to get the storage location of a_Position');
         return -1;
     }
+    
     gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
     
-    var u_Width = gl.getUniformLocation(gl.program, 'u_Width');
+    u_Width = gl.getUniformLocation(gl.program, 'u_Width');
     if (!u_Width) {
         console.log('Failed to get the storage location of u_Width');
         return;
     }
     
-    var u_Height = gl.getUniformLocation(gl.program, 'u_Height');
+    u_Height = gl.getUniformLocation(gl.program, 'u_Height');
     if (!u_Height) {
         console.log('Failed to get the storage location of u_Height');
         return;
@@ -158,11 +179,17 @@ function initVertexBuffers(gl) {
     gl.uniform1f(u_Width, gl.drawingBufferWidth);
     gl.uniform1f(u_Height, gl.drawingBufferHeight);
     
+    u_Param1 = gl.getUniformLocation(gl.program, 'u_Param1');
+    if (!u_Param1) {
+        console.log('Failed to get the storage location of u_Param1');
+        return;
+    }
+    
+    gl.uniform1f(u_Param1, 4.0);
+    
     // Enable the generic vertex attribute array
     gl.enableVertexAttribArray(a_Position);
     
     // Unbind the buffer object
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
-    
-    return n;
 }

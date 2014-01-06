@@ -1,13 +1,15 @@
 <doctype html>
 <html>
 <head>
-
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
 </head>
 <body onload="main()">
     <canvas id="webgl" width="500" height="500">
         Please use a browser that supports the canvas tag.
     </canvas>
     
+    <input type="range" id="param1" name="param1" min="1" max="100" />
+        
     <script src="webgl-utils.js"></script>
     <script src="webgl-debug.js"></script>
     <script src="cuon-utils.js"></script>
