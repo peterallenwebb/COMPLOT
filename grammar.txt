@@ -1,0 +1,42 @@
+start
+= additive
+
+additive
+= left:multiplicative op:("+" / "-") right:additive
+{ return { type: "func", name: op === "+" ? "add" : "sub" , left: left, right: right }; }
+/ multiplicative
+
+multiplicative
+= left:pow op:("*" / "/") right:multiplicative { return { type: "func", name: op === "*" ? "mult" : "div" , left: left, right: right }; }
+/ pow
+
+pow
+= base:primary "^" exponent:pow
+{ return { type: "func", name: "pow", base: base, exponent: exponent }; }
+/ primary
+
+primary
+= decimal
+/ int
+/ constant
+/ "(" addit:additive ")" { return addit; }
+/ "|" addit:additive "|" { return { type:"func", name:"mag", val:addit }; }
+/ funcapp;
+
+constant
+= "e" { return { "type": "constant", "name": "e", val: "vec2(M_E, 0.0)" }; }
+/ "pi" { return { "type": "constant", "name": "pi", val: "vec2(M_PI, 0.0)" }; }
+/ "i" { return { "type": "constant", "name": "i", val: "vec2(0.0, 1.0)" }; }
+
+decimal
+= int:int "." uint:uint { return { type: "number", intPart: int.intPart, fracPart: uint.intPart}; }
+
+int
+= sign:"-"? uint:uint { if (sign === "-") uint.intPart *= -1; return sign === "-" ? uint : uint; }
+
+uint "uint"
+= digits:[0-9]+ { return { type: "number", intPart: parseInt(digits.join("")), fracPart: 0}; }
+
+funcapp "funcapp"
+= funcName:("sin" / "cos" / "tan" / "exp") "(" additive:additive ")"
+{ return { type: "func", name: funcName, param1: additive } }

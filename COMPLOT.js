@@ -91,7 +91,11 @@ var FSHADER_SOURCE =
 '}                                                                    \n' +
 '                                                                     \n';
 
+var parser = {};
+
 function main() {
+    
+    jQuery.get('grammar.txt', function(data) { grammarReady(data); });
 
     var canvas = document.getElementById('webgl');
     
@@ -115,6 +119,10 @@ function main() {
     }
     
     draw(gl, n);
+}
+
+function grammarReady(grammar) {
+    parser = PEG.buildParser(exprGrammar);
 }
 
 function paramChange(event) {
