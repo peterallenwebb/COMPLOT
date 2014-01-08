@@ -1,20 +1,30 @@
 <doctype html>
 <html>
 <head>
-    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+    <link href="COMPLOT.css" rel="stylesheet" />
 </head>
-<body onload="main()">
+<body>
     <canvas id="webgl" width="500" height="500">
         Please use a browser that supports the canvas tag.
     </canvas>
     
     <input type="range" id="param1" name="param1" min="1" max="100" />
+    
+        <input type="text" id="expr" name="expr" />
+        <output id="parseStatus" class="unknown"></output>
         
+        <div id="debugTools">
+            <textarea id="ast"></textarea>
+        </div>
+    
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
     <script src="lib\webgl-utils.js"></script>
     <script src="lib\webgl-debug.js"></script>
     <script src="lib\cuon-utils.js"></script>
     <script src="lib\peg-0.8.0.min.js"></script>
-    
     <script src="complot.js"></script>
+    <script type="text/javascript">
+        $(document).ready(main);
+    </script>
 </body>
 </html>

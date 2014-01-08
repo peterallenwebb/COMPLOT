@@ -3,40 +3,39 @@ start
 
 additive
 = left:multiplicative op:("+" / "-") right:additive
-{ return { type: "func", name: op === "+" ? "add" : "sub" , left: left, right: right }; }
+  { return { type: "func", name: op === "+" ? "add" : "sub" , params: [ left, right ] }; }
 / multiplicative
 
 multiplicative
-= left:pow op:("*" / "/") right:multiplicative { return { type: "func", name: op === "*" ? "mult" : "div" , left: left, right: right }; }
+= left:pow op:("*" / "/") right:multiplicative 
+  { return { type: "func", name: op === "*" ? "mult" : "div" , params: [ left, right ] }; }
 / pow
 
 pow
 = base:primary "^" exponent:pow
-{ return { type: "func", name: "pow", base: base, exponent: exponent }; }
+  { return { type: "func", name: "pow", params: [ base, exponent ] }; }
 / primary
 
 primary
 = decimal
 / int
-/ constant
-/ "(" addit:additive ")" { return addit; }
-/ "|" addit:additive "|" { return { type:"func", name:"mag", val:addit }; }
+/ symbol
+/ "(" additive:additive ")" { return additive; }
+/ "|" additive:additive "|" { return { type:"func", name:"mag", params: [ additive ] }; }
 / funcapp;
 
-constant
-= "e" { return { "type": "constant", "name": "e", val: "vec2(M_E, 0.0)" }; }
-/ "pi" { return { "type": "constant", "name": "pi", val: "vec2(M_PI, 0.0)" }; }
-/ "i" { return { "type": "constant", "name": "i", val: "vec2(0.0, 1.0)" }; }
+symbol
+= symbol:("e" / "i" / "pi" / "z" / [A-Z]) { return { type: "symbol", name: symbol }; }
 
 decimal
 = int:int "." uint:uint { return { type: "number", intPart: int.intPart, fracPart: uint.intPart}; }
 
 int
-= sign:"-"? uint:uint { if (sign === "-") uint.intPart *= -1; return sign === "-" ? uint : uint; }
+= sign:"-"? uint:uint { if (sign === "-") uint.intPart *= -1; return uint; }
 
 uint "uint"
 = digits:[0-9]+ { return { type: "number", intPart: parseInt(digits.join("")), fracPart: 0}; }
 
 funcapp "funcapp"
-= funcName:("sin" / "cos" / "tan" / "exp") "(" additive:additive ")"
-{ return { type: "func", name: funcName, param1: additive } }
+= funcName:("arg" / "sin" / "exp") "(" additive:additive ")"
+{ return { type: "func", name: funcName, params: [ additive ] } }

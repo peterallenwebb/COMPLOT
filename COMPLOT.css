@@ -1,0 +1,22 @@
+
+#parseStatus
+{
+    display:inline-block;
+    width: 10px;
+    height: 10px;
+}
+
+#parseStatus.unknown
+{
+    background-color: #777777;
+}
+
+#parseStatus.ok
+{
+    background-color: #00EE00;
+}
+
+#parseStatus.error
+{
+    background-color: #EEEE00;
+}

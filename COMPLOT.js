@@ -91,7 +91,7 @@ var FSHADER_SOURCE =
 '}                                                                    \n' +
 '                                                                     \n';
 
-var parser = {};
+var parser = null;
 
 function main() {
     
@@ -99,6 +99,7 @@ function main() {
 
     var canvas = document.getElementById('webgl');
     
+    $('#expr').on('change keyup paste', exprChange);
     $('#param1').change(paramChange);
     
     gl = getWebGLContext(canvas, { antialias: true });
@@ -122,13 +123,66 @@ function main() {
 }
 
 function grammarReady(grammar) {
-    parser = PEG.buildParser(exprGrammar);
+    parser = PEG.buildParser(grammar);
+}
+
+var parsedExpr = null;
+
+function exprChange(event) {
+    $('#parseStatus').removeClass('ok error unknown');
+    $('#ast').val('');
+    
+    if (parser) {
+        var newExpr = $(this).val();
+        
+        try {
+            parsedExpr = parser.parse(newExpr);
+            $('#ast').val(JSON.stringify(parsedExpr));
+        }
+        catch (exp) {
+            $('#parseStatus').addClass('error');
+            return;
+        }
+        
+        $('#parseStatus').addClass('ok');
+    }
 }
 
 function paramChange(event) {
     var newVal = $(this).val();
     gl.uniform1f(u_Param1, newVal);
     draw(gl);
+}
+
+// TODO: Finish this function next...
+function astToShaderExpr(ast) {
+    
+    if (ast.type === "number") {
+        return number.intPart + "." + number.fracPart;
+    } else if (ast.type === "symbol") {
+        
+        switch (ast.name) {
+            case "i":
+                return { str: "vec2(0.0, 1.0)" };
+            case "z":
+                return { str: "z" };
+            case "e":
+                return { str: "M_E" };
+            case "pi":
+                return { str: "E_PI" };
+            default:
+                return { usedParams: [ ast.name ], str: "u_Param" + ast.name };
+        }
+    } else if (ast.type === "func") {
+        var shaderFuncName = ast.name.charAt(0).toUpperCase() + ast.name.slice(1);
+        
+        var paramString = "";
+        var usedParams = [];
+        
+        return { usedParams: usedParams, str: shaderFuncName + paramString };
+    }
+    
+    throw "Unexpected node type found in abstract syntax tree.";
 }
 
 var a_Position = 0;
