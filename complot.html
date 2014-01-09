@@ -8,13 +8,14 @@
         Please use a browser that supports the canvas tag.
     </canvas>
     
-    <input type="range" id="param1" name="param1" min="1" max="100" />
+    <input type="range" id="param1" name="param1" min="1" max="100" step="0.1" />
     
         <input type="text" id="expr" name="expr" />
         <output id="parseStatus" class="unknown"></output>
         
         <div id="debugTools">
             <textarea id="ast"></textarea>
+            <textarea id="shaderExpression"></textarea>
         </div>
     
     <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>

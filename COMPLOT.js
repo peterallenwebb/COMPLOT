@@ -1,4 +1,10 @@
 
+// TODO: Properly support ^ operation by adding cPow funciton
+// TODO: Properly support + and - operations in expression generation
+// TODO: Tolerate whitespace in expressions
+// TODO: Interpret hash portion of URL as formula for linking
+// TODO: Support for negating symbols
+
 var VSHADER_SOURCE =
 'attribute vec4 a_Position;                                           \n' +
 'void main()                                                          \n' +
@@ -12,7 +18,7 @@ var FSHADER_SOURCE =
 'precision highp float;                                             \n' +
 'uniform float u_Width;                                               \n' +
 'uniform float u_Height;                                              \n' +
-'uniform float u_Param1;                                              \n' +
+'uniform float u_Zoom;                                                \n' +
 
 'vec4 getRgbaByArg(vec2 c)                                            \n' +
 '{                                                                    \n' +
@@ -72,7 +78,7 @@ var FSHADER_SOURCE =
 '    return vec2(sqrt(dot(z, z)), 0.0);                               \n' +
 '}                                                                    \n' +
 
-// todos:
+// TODOs:
 // cPow
 // cCos
 // cTan
@@ -84,8 +90,9 @@ var FSHADER_SOURCE =
 '    vec2 z = vec2(gl_FragCoord.x / u_Width - 0.5,                    \n' +
 '                  0.5 - gl_FragCoord.y / u_Height);                  \n' +
 '                                                                     \n' +
-'    z = cExp(cDiv(vec2(1.0, 0.0),0.1*u_Param1*z));                                                    \n' +
+'    z /= u_Zoom / 30.0;                                               \n' +
 '                                                                     \n' +
+'    z = {js_generated_expr};                                         \n' +
 '                                                                     \n' +
 '    gl_FragColor = getRgbaByArg(z);                                  \n' +
 '}                                                                    \n' +
@@ -108,9 +115,8 @@ function main() {
         return;
     }
     
-    if (!initShaders(gl, VSHADER_SOURCE, FSHADER_SOURCE)) {
+    if (!initShaders(gl, VSHADER_SOURCE, FSHADER_SOURCE.replace('{js_generated_expr}', 'z'))) {
         console.log('Failed to intialize shaders.');
-        return;
     }
     
     var n = initVertexBuffers(gl);
@@ -126,7 +132,7 @@ function grammarReady(grammar) {
     parser = PEG.buildParser(grammar);
 }
 
-var parsedExpr = null;
+var parsedExprAst = null;
 
 function exprChange(event) {
     $('#parseStatus').removeClass('ok error unknown');
@@ -136,59 +142,105 @@ function exprChange(event) {
         var newExpr = $(this).val();
         
         try {
-            parsedExpr = parser.parse(newExpr);
-            $('#ast').val(JSON.stringify(parsedExpr));
+            var parsedExprAst = parser.parse(newExpr);
+            $('#ast').val(JSON.stringify(parsedExprAst));
+            
+            var shaderExpr = astToShaderExpr(parsedExprAst);
+            $('#shaderExpression').val(JSON.stringify(shaderExpr));
+            
+            updateShader(shaderExpr);
         }
         catch (exp) {
             $('#parseStatus').addClass('error');
+            $('#shaderExpression').val(exp);
             return;
         }
         
         $('#parseStatus').addClass('ok');
     }
+    else {
+        $('#parseStatus').addClass('unknown');
+    }
+}
+
+function updateShader(shaderExpr) {
+    var shaderTxt = FSHADER_SOURCE.replace('{js_generated_expr}', shaderExpr.str);
+    
+    // TODO: Dry this up.
+    if (!initShaders(gl, VSHADER_SOURCE, shaderTxt)) {
+        console.log('Failed to intialize shaders.');
+    }
+    
+    initVertexBuffers(gl);
+    
+    draw(gl);
 }
 
 function paramChange(event) {
     var newVal = $(this).val();
-    gl.uniform1f(u_Param1, newVal);
+    gl.uniform1f(u_Zoom, newVal);
     draw(gl);
 }
 
-// TODO: Finish this function next...
+// Convert the abstract syntax tree created by the parser into a
+// C-style expression in the shader language, and a list of the
+// constants used in the expression.
 function astToShaderExpr(ast) {
     
-    if (ast.type === "number") {
-        return number.intPart + "." + number.fracPart;
-    } else if (ast.type === "symbol") {
+    if (ast.type === 'number') {
+        return { str: 'vec2(' + ast.intPart + '.' + ast.fracPart + ', 0.0)' };
+    } else if (ast.type === 'symbol') {
         
         switch (ast.name) {
-            case "i":
-                return { str: "vec2(0.0, 1.0)" };
-            case "z":
-                return { str: "z" };
-            case "e":
-                return { str: "M_E" };
-            case "pi":
-                return { str: "E_PI" };
+            case 'i':
+                return { str: 'vec2(0.0, 1.0)' };
+            case 'z':
+                return { str: 'z' };
+            case 'e':
+                return { str: 'vec2(M_E, 0.0)' };
+            case 'pi':
+                return { str: 'vec2(M_PI, 0.0)' };
             default:
-                return { usedParams: [ ast.name ], str: "u_Param" + ast.name };
+                var usedParams = {};
+                usedParams[ast.name] = ast.name;
+                return { 'usedParams': usedParams, str: 'u_Param' + ast.name };
         }
-    } else if (ast.type === "func") {
-        var shaderFuncName = ast.name.charAt(0).toUpperCase() + ast.name.slice(1);
+    } else if (ast.type === 'func') {
+        var shaderFuncName = 'c' + ast.name.charAt(0).toUpperCase() +
+                             ast.name.slice(1);
         
-        var paramString = "";
+        var paramsString = '';
         var usedParams = [];
         
-        return { usedParams: usedParams, str: shaderFuncName + paramString };
+        var first = true;
+        for (var paramIdx in ast.params) {
+            var paramExpr = astToShaderExpr(ast.params[paramIdx]);
+            
+            if (first === false)
+                paramsString = paramsString + ', ';
+            
+            paramsString += paramExpr.str;
+            
+            if (paramExpr.usedParams) {
+                for (var exprParamIdx in paramExpr.usedParams) {
+                    usedParams[exprParamIdx] = exprParamIdx;
+                }
+            }
+            
+            first = false;
+        }
+        
+        return { usedParams: usedParams,
+                 str: shaderFuncName + '(' + paramsString + ')' };
     }
     
-    throw "Unexpected node type found in abstract syntax tree.";
+    throw 'Unexpected node type found in abstract syntax tree.';
 }
 
 var a_Position = 0;
 var u_Width = 0;
 var u_Height = 0;
-var u_Param1 = 0;
+var u_Zoom = 0;
 var gl = {};
 
 function draw()
@@ -241,14 +293,14 @@ function initVertexBuffers(gl) {
     gl.uniform1f(u_Width, gl.drawingBufferWidth);
     gl.uniform1f(u_Height, gl.drawingBufferHeight);
     
-    u_Param1 = gl.getUniformLocation(gl.program, 'u_Param1');
-    if (!u_Param1) {
-        console.log('Failed to get the storage location of u_Param1');
+    u_Zoom = gl.getUniformLocation(gl.program, 'u_Zoom');
+    if (!u_Zoom) {
+        console.log('Failed to get the storage location of u_Zoom');
         return;
     }
     
-    gl.uniform1f(u_Param1, 4.0);
-    
+    gl.uniform1f(u_Zoom, 4.0);
+     
     // Enable the generic vertex attribute array
     gl.enableVertexAttribArray(a_Position);
     
