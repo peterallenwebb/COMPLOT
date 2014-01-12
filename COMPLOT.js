@@ -1,6 +1,5 @@
 
 // TODO: Properly support ^ operation by adding cPow funciton
-// TODO: Properly support + and - operations in expression generation
 // TODO: Interpret hash portion of URL as formula for linking
 // TODO: Support for negating symbols
 
@@ -152,7 +151,7 @@ function exprChange(event) {
         catch (exp) {
             $('#parseStatus').addClass('error');
             $('#shaderExpression').val(exp);
-            return;
+           return;
         }
         
         $('#parseStatus').addClass('ok');
@@ -205,35 +204,49 @@ function astToShaderExpr(ast) {
                 return { 'usedParams': usedParams, str: 'u_Param' + ast.name };
         }
     } else if (ast.type === 'func') {
-        var shaderFuncName = 'c' + ast.name.charAt(0).toUpperCase() +
-                             ast.name.slice(1);
         
-        var paramsString = '';
-        var usedParams = [];
-        
-        var first = true;
-        for (var paramIdx in ast.params) {
-            var paramExpr = astToShaderExpr(ast.params[paramIdx]);
-            
-            if (first === false)
-                paramsString = paramsString + ', ';
-            
-            paramsString += paramExpr.str;
-            
-            if (paramExpr.usedParams) {
-                for (var exprParamIdx in paramExpr.usedParams) {
-                    usedParams[exprParamIdx] = exprParamIdx;
-                }
-            }
-            
-            first = false;
+        if (ast.name === 'add' || ast.name === 'sub') {
+            var op = ast.name === 'add' ? '+' : '-';
+            var leftExpr = astToShaderExpr(ast.params[0]);
+            var rightExpr = astToShaderExpr(ast.params[1])
+            var sumStr = '(' +  leftExpr.str + op +  rightExpr.str + ')';
+            return { str: sumStr,
+                     usedParams: { } };// TODO: Param merge
         }
-        
-        return { usedParams: usedParams,
-                 str: shaderFuncName + '(' + paramsString + ')' };
+        else {
+            return getStdFuncExpr(ast);
+        }
     }
     
     throw 'Unexpected node type found in abstract syntax tree.';
+}
+
+function getStdFuncExpr(ast) {
+    var shaderFuncName = 'c' + ast.name.charAt(0).toUpperCase() + ast.name.slice(1);
+    
+    var paramsString = '';
+    var usedParams = [];
+    
+    var first = true;
+    for (var paramIdx in ast.params) {
+        var paramExpr = astToShaderExpr(ast.params[paramIdx]);
+        
+        if (first === false)
+            paramsString = paramsString + ', ';
+        
+        paramsString += paramExpr.str;
+        
+        if (paramExpr.usedParams) {
+            for (var exprParamIdx in paramExpr.usedParams) {
+                usedParams[exprParamIdx] = exprParamIdx;
+            }
+        }
+        
+        first = false;
+    }
+    
+    return { usedParams: usedParams,
+        str: shaderFuncName + '(' + paramsString + ')' };
 }
 
 var a_Position = 0;

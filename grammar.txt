@@ -1,6 +1,6 @@
 
 start
-= _ additive _
+= _ additive:additive _ { return additive; }
 
 _ "whitespace" = [ \t\r\n]*
 
