@@ -1,7 +1,6 @@
 
 // TODO: Properly support ^ operation by adding cPow funciton
 // TODO: Properly support + and - operations in expression generation
-// TODO: Tolerate whitespace in expressions
 // TODO: Interpret hash portion of URL as formula for linking
 // TODO: Support for negating symbols
 
