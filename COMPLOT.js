@@ -1,7 +1,8 @@
 
-// TODO: Properly support ^ operation by adding cPow funciton
 // TODO: Interpret hash portion of URL as formula for linking
 // TODO: Support for negating symbols
+// TODO: Support mouse-drag panning
+// TODO: Support mouse-wheel zooming
 
 var VSHADER_SOURCE =
 'attribute vec4 a_Position;                                           \n' +
@@ -71,13 +72,17 @@ var FSHADER_SOURCE =
 '                cArg(z).x);                                          \n' +
 '}                                                                    \n' +
 
+'vec2 cPow(vec2 z, vec2 c)                                            \n' +
+'{                                                                    \n' +
+'    return cExp(cMult(c, cLog(z)));                                  \n' +
+'}                                                                    \n' +
+
 'vec2 cMag(vec2 z)                                                    \n' +
 '{                                                                    \n' +
 '    return vec2(sqrt(dot(z, z)), 0.0);                               \n' +
 '}                                                                    \n' +
 
 // TODOs:
-// cPow
 // cCos
 // cTan
 // cSinh, cCosh

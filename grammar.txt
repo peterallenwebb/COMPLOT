@@ -5,14 +5,34 @@ start
 _ "whitespace" = [ \t\r\n]*
 
 additive
-= left:multiplicative _ op:("+" / "-") _ right:additive
-  { return { type: "func", name: op === "+" ? "add" : "sub" , params: [ left, right ] }; }
-/ multiplicative
+= left:multiplicative tail:(_ ("+" / "-") _ multiplicative)*
+  {
+      var sum = left;
+
+      for (var i = 0; i < tail.length; i++)
+      {
+          var op = tail[i][1] === "+" ? "add" : "sub";
+          var right = tail[i][3];
+          sum = { type: "func", name: op, params: [ sum, right ]};
+      }
+
+      return sum;
+  }
 
 multiplicative
-= left:pow _ op:("*" / "/") _ right:multiplicative 
-  { return { type: "func", name: op === "*" ? "mult" : "div" , params: [ left, right ] }; }
-/ pow
+= left:pow tail:(_ ("*" / "/") _ pow)*
+  {
+      var product = left;
+
+      for (var i = 0; i < tail.length; i++)
+      {
+          var op = tail[i][1] === "*" ? "mult" : "div";
+          var right = tail[i][3];
+          product = { type: "func", name: op, params: [ product, right ]};
+      }
+
+      return product;
+  }
 
 pow
 = base:primary _ "^" _ exponent:pow
