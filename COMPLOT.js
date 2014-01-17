@@ -2,7 +2,7 @@
 // TODO: Interpret hash portion of URL as formula for linking
 // TODO: Support for negating symbols
 // TODO: Support mouse-drag panning
-// TODO: Support mouse-wheel zooming
+
 
 var VSHADER_SOURCE =
 'attribute vec4 a_Position;                                           \n' +
@@ -15,22 +15,30 @@ var FSHADER_SOURCE =
 '#define M_PI 3.1415926535897932384626433832795                       \n' +
 '#define M_E 2.71828182845904523536028747135266                       \n' +
 'precision highp float;                                             \n' +
-'uniform float u_Width;                                               \n' +
-'uniform float u_Height;                                              \n' +
-'uniform float u_Zoom;                                                \n' +
+'uniform float u_width;                                               \n' +
+'uniform float u_height;                                              \n' +
+'uniform float u_zoom;                                                \n' +
 
 'vec4 getRgbaByArg(vec2 c)                                            \n' +
 '{                                                                    \n' +
-'    if (dot(c, c) < 0.00390625) return vec4(0.0, 0.0, 0.0, 1.0);     \n' +
-'    if (dot(c, c) > 1.0 - 0.05 && dot(c, c) < 1.0 + 0.05)            \n' +
-'        return vec4(0.0, 0.0, 0.0, 1.0);                             \n' +
 '    float sixAngle = (atan(c.y, c.x) + M_PI) / M_PI * 3.0;           \n' +
-'    if (sixAngle < 1.0) return vec4(1.0, sixAngle, 0.0, 1.0);        \n' +
-'    if (sixAngle < 2.0) return vec4(2.0 - sixAngle, 1.0, 0.0, 1.0);  \n' +
-'    if (sixAngle < 3.0) return vec4(0.0, 1.0, sixAngle - 2.0, 1.0);  \n' +
-'    if (sixAngle < 4.0) return vec4(0.0, 4.0 - sixAngle, 1.0, 1.0);  \n' +
-'    if (sixAngle < 5.0) return vec4(sixAngle - 4.0, 0.0, 1.0, 1.0);  \n' +
-'    return vec4(1.0, 0.0, 6.0 - sixAngle, 1.0);                      \n' +
+'    vec4 rgba;                                                       \n' +
+'    if (sixAngle < 1.0) rgba = vec4(1.0, sixAngle, 0.0, 1.0);        \n' +
+'    else if (sixAngle < 2.0) rgba = vec4(2.0 - sixAngle, 1.0, 0.0, 1.0);  \n' +
+'    else if (sixAngle < 3.0) rgba = vec4(0.0, 1.0, sixAngle - 2.0, 1.0);  \n' +
+'    else if (sixAngle < 4.0) rgba = vec4(0.0, 4.0 - sixAngle, 1.0, 1.0);  \n' +
+'    else if (sixAngle < 5.0) rgba = vec4(sixAngle - 4.0, 0.0, 1.0, 1.0);  \n' +
+'    else rgba = vec4(1.0, 0.0, 6.0 - sixAngle, 1.0);                 \n' +
+'                                                                     \n' +
+'    if (dot(c, c) < 0.00390625)                                      \n' +
+'        rgba *= 0.6;                                                 \n' +
+'                                                                     \n' +
+'    if (dot(c, c) > 1.0 - 0.05 && dot(c, c) < 1.0 + 0.05)            \n' +
+'        rgba *= 0.6;                                                 \n' +
+'                                                                     \n' +
+'    rgba[3] = 1.0;                                                   \n' +
+'                                                                     \n' +
+'    return rgba;                                                     \n' +
 '}                                                                    \n' +
 
 'vec2 cMult(vec2 z1, vec2 z2)                                         \n' +
@@ -90,10 +98,10 @@ var FSHADER_SOURCE =
 
 'void main()                                                          \n' +
 '{                                                                    \n' +
-'    vec2 z = vec2(gl_FragCoord.x / u_Width - 0.5,                    \n' +
-'                  0.5 - gl_FragCoord.y / u_Height);                  \n' +
+'    vec2 z = vec2(gl_FragCoord.x / u_width - 0.5,                    \n' +
+'                  0.5 - gl_FragCoord.y / u_height);                  \n' +
 '                                                                     \n' +
-'    z /= u_Zoom / 30.0;                                               \n' +
+'    z /= u_zoom / 30.0;                                               \n' +
 '                                                                     \n' +
 '    z = {js_generated_expr};                                         \n' +
 '                                                                     \n' +
@@ -112,6 +120,11 @@ function main() {
     $('#expr').on('change keyup paste', exprChange);
     $('#param1').change(paramChange);
     
+    $(document).mousemove(mouseMove);
+    $(document).mouseup(mouseUp);
+    $('#webgl').mousedown(mouseDown);
+    $('#webgl').mousewheel(mouseWheel);
+    
     gl = getWebGLContext(canvas, { antialias: true });
     if (!gl) {
         console.log('Failed to get the rendering context for WebGL');
@@ -129,6 +142,37 @@ function main() {
     }
     
     draw(gl, n);
+}
+
+var dragging = false;
+var dragStart = { x: 0, y: 0 };
+
+function mouseDown(event) {
+    dragging = true;
+    // TODO: Etc.
+}
+
+function mouseUp(event) {
+}
+
+function mouseDown(event) {
+}
+
+function mouseMove(event) {
+}
+
+function mouseWheel(event) {
+    if (event.deltaY > 0)
+        zoom *= 1.05;
+    else if (event.deltaY < 0)
+        zoom *= 0.95;
+    
+    gl.uniform1f(u_Zoom, zoom);
+    draw(gl);
+    
+    console.log('wheel');
+    
+    return false;
 }
 
 function grammarReady(grammar) {
@@ -258,10 +302,15 @@ var a_Position = 0;
 var u_Width = 0;
 var u_Height = 0;
 var u_Zoom = 0;
+
+var zoom = 1.0;
+
 var gl = {};
 
-function draw()
-{
+var u_centerX = 0.0;
+var u_centerY = 0.0;
+
+function draw() {
     gl.clearColor(0, 0, 0, 1.0);
     
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -294,15 +343,15 @@ function initVertexBuffers(gl) {
     
     gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
     
-    u_Width = gl.getUniformLocation(gl.program, 'u_Width');
+    u_Width = gl.getUniformLocation(gl.program, 'u_width');
     if (!u_Width) {
-        console.log('Failed to get the storage location of u_Width');
+        console.log('Failed to get the storage location of u_width');
         return;
     }
     
-    u_Height = gl.getUniformLocation(gl.program, 'u_Height');
+    u_Height = gl.getUniformLocation(gl.program, 'u_height');
     if (!u_Height) {
-        console.log('Failed to get the storage location of u_Height');
+        console.log('Failed to get the storage location of u_height');
         return;
     }
     
@@ -310,13 +359,13 @@ function initVertexBuffers(gl) {
     gl.uniform1f(u_Width, gl.drawingBufferWidth);
     gl.uniform1f(u_Height, gl.drawingBufferHeight);
     
-    u_Zoom = gl.getUniformLocation(gl.program, 'u_Zoom');
+    u_Zoom = gl.getUniformLocation(gl.program, 'u_zoom');
     if (!u_Zoom) {
-        console.log('Failed to get the storage location of u_Zoom');
+        console.log('Failed to get the storage location of u_zoom');
         return;
     }
     
-    gl.uniform1f(u_Zoom, 4.0);
+    gl.uniform1f(u_Zoom, zoom);
      
     // Enable the generic vertex attribute array
     gl.enableVertexAttribArray(a_Position);
