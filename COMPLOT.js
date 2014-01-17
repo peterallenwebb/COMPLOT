@@ -2,6 +2,8 @@
 // TODO: Interpret hash portion of URL as formula for linking
 // TODO: Support for negating symbols
 // TODO: Support mouse-drag panning
+// TODO: cSinh, cCosh
+// TODO: cGamma (Lanczos)
 
 
 var VSHADER_SOURCE =
@@ -14,7 +16,7 @@ var VSHADER_SOURCE =
 var FSHADER_SOURCE =
 '#define M_PI 3.1415926535897932384626433832795                       \n' +
 '#define M_E 2.71828182845904523536028747135266                       \n' +
-'precision highp float;                                             \n' +
+'precision highp float;                                               \n' +
 'uniform float u_width;                                               \n' +
 'uniform float u_height;                                              \n' +
 'uniform float u_zoom;                                                \n' +
@@ -31,10 +33,10 @@ var FSHADER_SOURCE =
 '    else rgba = vec4(1.0, 0.0, 6.0 - sixAngle, 1.0);                 \n' +
 '                                                                     \n' +
 '    if (dot(c, c) < 0.00390625)                                      \n' +
-'        rgba *= 0.6;                                                 \n' +
+'        rgba *= 0.8;                                                 \n' +
 '                                                                     \n' +
 '    if (dot(c, c) > 1.0 - 0.05 && dot(c, c) < 1.0 + 0.05)            \n' +
-'        rgba *= 0.6;                                                 \n' +
+'        rgba *= 0.8;                                                 \n' +
 '                                                                     \n' +
 '    rgba[3] = 1.0;                                                   \n' +
 '                                                                     \n' +
@@ -74,6 +76,19 @@ var FSHADER_SOURCE =
 '                cos(z.x) * (eTozy - eToNegzy)) / 2.0;                \n' +
 '}                                                                    \n' +
 
+'vec2 cCos(vec2 z)                                                    \n' +
+'{                                                                    \n' +
+'    float eTozy = pow(M_E, z.y);                                     \n' +
+'    float eToNegzy = pow(M_E, -z.y);                                 \n' +
+'    return vec2(cos(z.x) * (eTozy + eToNegzy),                       \n' +
+'                -1.0 * sin(z.x) * (eTozy - eToNegzy)) / 2.0;         \n' +
+'}                                                                    \n' +
+
+'vec2 cTan(vec2 z)                                                    \n' +
+'{                                                                    \n' +
+'    return cDiv(cSin(z), cCos(z));                                   \n' +
+'}                                                                    \n' +
+
 'vec2 cLog(vec2 z)                                                    \n' +
 '{                                                                    \n' +
 '    return vec2(log(sqrt(dot(z, z))),                                \n' +
@@ -89,12 +104,6 @@ var FSHADER_SOURCE =
 '{                                                                    \n' +
 '    return vec2(sqrt(dot(z, z)), 0.0);                               \n' +
 '}                                                                    \n' +
-
-// TODOs:
-// cCos
-// cTan
-// cSinh, cCosh
-// cGamma (Lanczos)
 
 'void main()                                                          \n' +
 '{                                                                    \n' +
