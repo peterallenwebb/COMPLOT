@@ -38,6 +38,12 @@ var FSHADER_SOURCE =
 '    if (dot(c, c) > 1.0 - 0.05 && dot(c, c) < 1.0 + 0.05)            \n' +
 '        rgba *= 0.8;                                                 \n' +
 '                                                                     \n' +
+'    float rFloor = c.x - mod(c.x, 1.0);                              \n' +
+'    float iFloor = c.y - mod(c.y, 1.0);                              \n' +
+'                                                                     \n' +
+'    if (mod(rFloor + iFloor, 2.0) == 0.0)                            \n' +
+'        rgba *= 0.8;                                                 \n' +
+'                                                                     \n' +
 '    rgba[3] = 1.0;                                                   \n' +
 '                                                                     \n' +
 '    return rgba;                                                     \n' +
@@ -107,10 +113,10 @@ var FSHADER_SOURCE =
 
 'void main()                                                          \n' +
 '{                                                                    \n' +
-'    vec2 z = vec2(gl_FragCoord.x / u_width - 0.5,                    \n' +
-'                  0.5 - gl_FragCoord.y / u_height);                  \n' +
+'    vec2 z = vec2(gl_FragCoord.x / u_width - 0.5,                          \n' +
+'                  (u_height/u_width) * (0.5 - gl_FragCoord.y / u_height)); \n' +
 '                                                                     \n' +
-'    z /= u_zoom / 30.0;                                               \n' +
+'    z /= u_zoom / 30.0;                                              \n' +
 '                                                                     \n' +
 '    z = {js_generated_expr};                                         \n' +
 '                                                                     \n' +
