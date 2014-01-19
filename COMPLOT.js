@@ -3,7 +3,6 @@
 // TODO: Support for negating symbols
 // TODO: Support mouse-drag panning
 // TODO: cSinh, cCosh
-// TODO: cGamma (Lanczos)
 
 
 var VSHADER_SOURCE =
@@ -111,6 +110,46 @@ var FSHADER_SOURCE =
 '    return vec2(sqrt(dot(z, z)), 0.0);                               \n' +
 '}                                                                    \n' +
 
+// Gamma implementation based on Lanczos approximation. Adapted from
+// python code in Wikipedia entry on Lanczos.
+'vec2 cGamma(vec2 z)                                                    \n' +
+'{                                                                      \n' +
+'    float p[9];                                                        \n' +
+'    p[0] = 0.99999999999980993;                                        \n' +
+'    p[1] = 676.5203681218851;                                          \n' +
+'    p[2] = -1259.1392167224028;                                        \n' +
+'    p[3] = 771.32342877765313;                                         \n' +
+'    p[4] = -176.61502916214059;                                        \n' +
+'    p[5] = 12.507343278686905;                                         \n' +
+'    p[6] = -0.13857109526572012;                                       \n' +
+'    p[7] = 9.9843695780195716e-6;                                      \n' +
+'    p[8] = 1.5056327351493116e-7;                                      \n' +
+    
+'    bool reflected = false;                                            \n' +
+'    vec2 origZ = z;                                            \n' +
+'    if (z.x < 0.5)                                                     \n' +
+'    {                                                                  \n' +
+'        z = vec2(1.0, 0.0) - z;                                        \n' +
+'        reflected = true;                                              \n' +
+'    }                                                                  \n' +
+    
+'    z -= vec2(1.0, 0.0);                                               \n' +
+    
+'    vec2 x = vec2(p[0], 0.0);                                          \n' +
+'    for (int i = 1; i < 9; i++)                                        \n' +
+'    {                                                                  \n' +
+'        x += cDiv(vec2(p[i], 0.0), z + vec2(float(i), 0.0));           \n' +
+'    }                                                                  \n' +
+    
+'    vec2 t = z + vec2(7.5, 0.0);                                       \n' +
+'    vec2 result = cMult(cMult(sqrt(2.0 * M_PI) * cPow(t, z + vec2(0.5, 0.0)), cExp(-t)), x); \n' +
+    
+'    if (!reflected)                                                    \n' +
+'        return result;                                                 \n' +
+'    else                                                               \n' +
+'        return cDiv(vec2(M_PI, 0.0), cMult(cSin(M_PI * origZ), result));                \n' +
+'}                                                                    \n' +
+
 'void main()                                                          \n' +
 '{                                                                    \n' +
 '    vec2 z = vec2(gl_FragCoord.x / u_width - 0.5,                          \n' +
@@ -123,6 +162,7 @@ var FSHADER_SOURCE =
 '    gl_FragColor = getRgbaByArg(z);                                  \n' +
 '}                                                                    \n' +
 '                                                                     \n';
+
 
 var parser = null;
 
