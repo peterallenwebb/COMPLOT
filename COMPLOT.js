@@ -1,7 +1,6 @@
 
 // TODO: Interpret hash portion of URL as formula for linking
 // TODO: Support for negating symbols
-// TODO: Support mouse-drag panning
 // TODO: cSinh, cCosh
 
 
@@ -18,6 +17,8 @@ var FSHADER_SOURCE =
 'precision highp float;                                               \n' +
 'uniform float u_width;                                               \n' +
 'uniform float u_height;                                              \n' +
+'uniform float u_offsetX;                                             \n' +
+'uniform float u_offsetY;                                             \n' +
 'uniform float u_zoom;                                                \n' +
 
 'vec4 getRgbaByArg(vec2 c)                                            \n' +
@@ -126,7 +127,7 @@ var FSHADER_SOURCE =
 '    p[8] = 1.5056327351493116e-7;                                      \n' +
     
 '    bool reflected = false;                                            \n' +
-'    vec2 origZ = z;                                            \n' +
+'    vec2 origZ = z;                                                    \n' +
 '    if (z.x < 0.5)                                                     \n' +
 '    {                                                                  \n' +
 '        z = vec2(1.0, 0.0) - z;                                        \n' +
@@ -152,8 +153,8 @@ var FSHADER_SOURCE =
 
 'void main()                                                          \n' +
 '{                                                                    \n' +
-'    vec2 z = vec2(gl_FragCoord.x / u_width - 0.5,                          \n' +
-'                  (u_height/u_width) * (0.5 - gl_FragCoord.y / u_height)); \n' +
+'    vec2 z = vec2((gl_FragCoord.x + u_offsetX) / u_width - 0.5,                          \n' +
+'                  (u_height/u_width) * (0.5 - (gl_FragCoord.y - u_offsetY) / u_height)); \n' +
 '                                                                     \n' +
 '    z /= u_zoom / 30.0;                                              \n' +
 '                                                                     \n' +
@@ -202,18 +203,30 @@ function main() {
 var dragging = false;
 var dragStart = { x: 0, y: 0 };
 
-function mouseDown(event) {
-    dragging = true;
-    // TODO: Etc.
-}
-
 function mouseUp(event) {
+    dragging = false;
 }
 
 function mouseDown(event) {
+    console.log("down")
+    dragging = true;
+    dragStart.x = event.offsetX;
+    dragStart.y = event.offsetY;
 }
 
 function mouseMove(event) {
+
+    if (dragging) {
+        offsetX += dragStart.x - event.offsetX;
+        offsetY += dragStart.y - event.offsetY;
+        dragStart.x = event.offsetX;
+        dragStart.y = event.offsetY;
+    }
+    
+    gl.uniform1f(u_offsetX, offsetX);
+    gl.uniform1f(u_offsetY, offsetY);
+    
+    draw(gl);
 }
 
 function mouseWheel(event) {
@@ -222,7 +235,7 @@ function mouseWheel(event) {
     else if (event.deltaY < 0)
         zoom *= 0.95;
     
-    gl.uniform1f(u_Zoom, zoom);
+    gl.uniform1f(u_zoom, zoom);
     draw(gl);
     
     console.log('wheel');
@@ -249,6 +262,10 @@ function exprChange(event) {
             
             var shaderExpr = astToShaderExpr(parsedExprAst);
             $('#shaderExpression').val(JSON.stringify(shaderExpr));
+            
+            offsetX = 0.0;
+            offsetY = 0.0;
+            zoom = 1.0;
             
             updateShader(shaderExpr);
         }
@@ -280,7 +297,7 @@ function updateShader(shaderExpr) {
 
 function paramChange(event) {
     var newVal = $(this).val();
-    gl.uniform1f(u_Zoom, newVal);
+    gl.uniform1f(u_zoom, newVal);
     draw(gl);
 }
 
@@ -354,16 +371,20 @@ function getStdFuncExpr(ast) {
 }
 
 var a_Position = 0;
-var u_Width = 0;
-var u_Height = 0;
-var u_Zoom = 0;
-
-var zoom = 1.0;
+var u_width = 0;
+var u_height = 0;
+var u_zoom = 0;
+var u_offsetX = 0;
+var u_offsetY = 0;
 
 var gl = {};
 
-var u_centerX = 0.0;
-var u_centerY = 0.0;
+// Amount to offset view window from origin-centered, in
+// canvas pixels.
+var offsetX = 0.0;
+var offsetY = 0.0;
+var zoom = 1.0;
+
 
 function draw() {
     gl.clearColor(0, 0, 0, 1.0);
@@ -386,6 +407,7 @@ function initVertexBuffers(gl) {
     
     // Bind the buffer object to target
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+    
     // Write date into the buffer object
     gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
     
@@ -398,33 +420,31 @@ function initVertexBuffers(gl) {
     
     gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
     
-    u_Width = gl.getUniformLocation(gl.program, 'u_width');
-    if (!u_Width) {
-        console.log('Failed to get the storage location of u_width');
-        return;
-    }
+    u_width = getLocation('u_width');
+    u_height = getLocation('u_height');
+    u_offsetX = getLocation('u_offsetX');
+    u_offsetY = getLocation('u_offsetY');
+    u_zoom = getLocation('u_zoom');
     
-    u_Height = gl.getUniformLocation(gl.program, 'u_height');
-    if (!u_Height) {
-        console.log('Failed to get the storage location of u_height');
-        return;
-    }
-    
-    // Pass the width and hight of the <canvas>
-    gl.uniform1f(u_Width, gl.drawingBufferWidth);
-    gl.uniform1f(u_Height, gl.drawingBufferHeight);
-    
-    u_Zoom = gl.getUniformLocation(gl.program, 'u_zoom');
-    if (!u_Zoom) {
-        console.log('Failed to get the storage location of u_zoom');
-        return;
-    }
-    
-    gl.uniform1f(u_Zoom, zoom);
+    gl.uniform1f(u_width, gl.drawingBufferWidth);
+    gl.uniform1f(u_height, gl.drawingBufferHeight);
+    gl.uniform1f(u_offsetX, offsetX);
+    gl.uniform1f(u_offsetY, offsetY);
+    gl.uniform1f(u_zoom, zoom);
      
     // Enable the generic vertex attribute array
     gl.enableVertexAttribArray(a_Position);
     
     // Unbind the buffer object
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
+}
+
+function getLocation(varName)
+{
+    var offset = gl.getUniformLocation(gl.program, varName);
+    
+    if (!offset)
+        throw 'Failed to get the storage location of ' + varName;
+    
+    return offset;
 }
