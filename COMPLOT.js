@@ -230,12 +230,29 @@ function mouseMove(event) {
 }
 
 function mouseWheel(event) {
-    if (event.deltaY > 0)
-        zoom *= 1.05;
-    else if (event.deltaY < 0)
-        zoom *= 0.95;
     
+    var zoomFactor = 1.0;
+    
+    if (event.deltaY > 0)
+        zoomFactor *= 1.02;
+    else if (event.deltaY < 0)
+        zoomFactor *= 0.98;
+    
+    zoom *= zoomFactor;
+    
+    offsetX += event.offsetX - (gl.drawingBufferWidth / 2);
+    offsetY += event.offsetY - (gl.drawingBufferHeight / 2);
+    
+    offsetX *= zoomFactor;
+    offsetY *= zoomFactor;
+    
+    offsetX -= event.offsetX - (gl.drawingBufferWidth / 2);
+    offsetY -= event.offsetY - (gl.drawingBufferHeight / 2);
+    
+    gl.uniform1f(u_offsetX, offsetX);
+    gl.uniform1f(u_offsetY, offsetY);
     gl.uniform1f(u_zoom, zoom);
+    
     draw(gl);
     
     console.log('wheel');
