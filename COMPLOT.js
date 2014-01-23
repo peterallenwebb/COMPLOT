@@ -174,7 +174,6 @@ function main() {
     var canvas = document.getElementById('webgl');
     
     $('#expr').on('change keyup paste', exprChange);
-    $('#param1').change(paramChange);
     
     $(document).mousemove(mouseMove);
     $(document).mouseup(mouseUp);
@@ -309,12 +308,6 @@ function updateShader(shaderExpr) {
     
     initVertexBuffers(gl);
     
-    draw(gl);
-}
-
-function paramChange(event) {
-    var newVal = $(this).val();
-    gl.uniform1f(u_zoom, newVal);
     draw(gl);
 }
 
