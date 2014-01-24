@@ -11,6 +11,23 @@
     background-color: #777777;
 }
 
+#plotArea
+{
+    position: relative;
+}
+
+#formulaArea
+{
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    padding: 3px 6px 3px 6px;
+    border-radius: 4px;
+    background-color: #000000;
+    opacity: 0.7;
+    border: 2px solid #FFFFFF;
+}
+
 #parseStatus.ok
 {
     background-color: #00EE00;
@@ -24,4 +41,9 @@
 #param1
 {
     width: 400px;
+}
+
+#debugArea
+{
+  visibility: collapse;
 }

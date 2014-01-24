@@ -9,14 +9,17 @@
     <link href="COMPLOT.css" rel="stylesheet" />
 </head>
 <body>
-    <canvas id="webgl" width="800" height="450">
-        Please use a browser that supports the canvas tag.
-    </canvas>
+    <div id="plotArea">
+        <canvas id="webgl" width="800" height="500">
+            Please use a browser that supports the canvas tag.
+        </canvas>
+        <div id="formulaArea">
+            <input type="text" id="expr" name="expr" />
+            <output id="parseStatus" class="unknown"></output>
+        </div>
+    </div>
     
-    <input type="text" id="expr" name="expr" />
-    <output id="parseStatus" class="unknown"></output>
-        
-    <div id="debugTools">
+    <div id="debugArea">
         <textarea id="ast"></textarea>
         <textarea id="shaderExpression"></textarea>
     </div>
