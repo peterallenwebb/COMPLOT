@@ -37,7 +37,7 @@ var FSHADER_SOURCE =
 '                                                                     \n' +
 '    if (dot(c, c) > 1.0 - 0.05 && dot(c, c) < 1.0 + 0.05)            \n' +
 '        rgba *= 0.8;                                                 \n' +
-'                                                                     \n' +
+'    c = c * 5.0;                                                                 \n' +
 '    float rFloor = c.x - mod(c.x, 1.0);                              \n' +
 '    float iFloor = c.y - mod(c.y, 1.0);                              \n' +
 '                                                                     \n' +
@@ -109,6 +109,16 @@ var FSHADER_SOURCE =
 'vec2 cMag(vec2 z)                                                    \n' +
 '{                                                                    \n' +
 '    return vec2(sqrt(dot(z, z)), 0.0);                               \n' +
+'}                                                                    \n' +
+
+'vec2 cRe(vec2 z)                                                     \n' +
+'{                                                                    \n' +
+'    return vec2(z.x, 0.0);                                           \n' +
+'}                                                                    \n' +
+
+'vec2 cIm(vec2 z)                                                     \n' +
+'{                                                                    \n' +
+'    return vec2(0.0, z.y);                                           \n' +
 '}                                                                    \n' +
 
 // Gamma implementation based on Lanczos approximation. Adapted from
@@ -273,14 +283,34 @@ function mouseWheel(event) {
 
 function grammarReady(grammar) {
     parser = PEG.buildParser(grammar);
+    
+    var hash = window.location.hash;
+    if (hash.length > 0) {
+        var expr = decodeURIComponent(hash.substring(1));
+        $('#expr').val(expr);
+        updateExpr(expr);
+    }
 }
 
 function exprChange(event) {
+    
+    var newExpr = $(this).val().replace(/\s/g, '');
+    
+    if (newExpr === currExpr) {
+        return;
+    }
+    
+    updateExpr(newExpr);
+}
+
+function updateExpr(newExpr) {
+    
+    currExpr = newExpr;
+    
     $('#parseStatus').removeClass('ok error unknown');
     $('#ast').val('');
     
     if (parser) {
-        var newExpr = $(this).val();
         
         try {
             var parsedExprAst = parser.parse(newExpr);
@@ -294,11 +324,15 @@ function exprChange(event) {
             zoom = 1.0;
             
             updateShader(shaderExpr);
+            
+            var uriExpr = encodeURIComponent(currExpr);
+            window.location = '#' + uriExpr
         }
         catch (exp) {
+            console.log(exp);
             $('#parseStatus').addClass('error');
             $('#shaderExpression').val(exp);
-           return;
+            return;
         }
         
         $('#parseStatus').addClass('ok');
@@ -306,6 +340,7 @@ function exprChange(event) {
     else {
         $('#parseStatus').addClass('unknown');
     }
+
 }
 
 function updateShader(shaderExpr) {
@@ -404,6 +439,7 @@ var offsetX = 0.0;
 var offsetY = 0.0;
 var zoom = 1.0;
 var canvas = {};
+var currExpr = '';
 
 
 function draw() {
@@ -461,8 +497,7 @@ function initVertexBuffers() {
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
 }
 
-function getLocation(varName)
-{
+function getLocation(varName) {
     var offset = gl.getUniformLocation(gl.program, varName);
     
     if (!offset)
