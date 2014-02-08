@@ -37,7 +37,7 @@ var FSHADER_SOURCE =
 '                                                                     \n' +
 '    if (dot(c, c) > 1.0 - 0.05 && dot(c, c) < 1.0 + 0.05)            \n' +
 '        rgba *= 0.8;                                                 \n' +
-'                                                                     \n' +
+'    c = c * 5.0;                                                                 \n' +
 '    float rFloor = c.x - mod(c.x, 1.0);                              \n' +
 '    float iFloor = c.y - mod(c.y, 1.0);                              \n' +
 '                                                                     \n' +
@@ -111,6 +111,16 @@ var FSHADER_SOURCE =
 '    return vec2(sqrt(dot(z, z)), 0.0);                               \n' +
 '}                                                                    \n' +
 
+'vec2 cRe(vec2 z)                                                     \n' +
+'{                                                                    \n' +
+'    return vec2(z.x, 0.0);                                           \n' +
+'}                                                                    \n' +
+
+'vec2 cIm(vec2 z)                                                     \n' +
+'{                                                                    \n' +
+'    return vec2(0.0, z.y);                                           \n' +
+'}                                                                    \n' +
+
 // Gamma implementation based on Lanczos approximation. Adapted from
 // python code in Wikipedia entry on Lanczos.
 'vec2 cGamma(vec2 z)                                                    \n' +
@@ -171,7 +181,7 @@ function main() {
     
     jQuery.get('grammar.txt', function(data) { grammarReady(data); });
 
-    var canvas = document.getElementById('webgl');
+    canvas = document.getElementById('webgl');
     
     $('#expr').on('change keyup paste', exprChange);
     
@@ -179,6 +189,11 @@ function main() {
     $(document).mouseup(mouseUp);
     $('#webgl').mousedown(mouseDown);
     $('#webgl').mousewheel(mouseWheel);
+    
+    $(window).resize(plotAreaResize);
+    
+    // Prevent change to text-selection "i-beam" cursor on mouse down.
+    canvas.onselectstart = function() { return false; }
     
     gl = getWebGLContext(canvas, { antialias: true });
     if (!gl) {
@@ -190,13 +205,7 @@ function main() {
         console.log('Failed to intialize shaders.');
     }
     
-    var n = initVertexBuffers(gl);
-    if (n < 0) {
-        console.log('Failed to set the positions of the vertices');
-        return;
-    }
-    
-    draw(gl, n);
+    plotAreaResize();
 }
 
 var dragging = false;
@@ -207,7 +216,6 @@ function mouseUp(event) {
 }
 
 function mouseDown(event) {
-    console.log("down")
     dragging = true;
     dragStart.x = event.offsetX;
     dragStart.y = event.offsetY;
@@ -225,7 +233,21 @@ function mouseMove(event) {
     gl.uniform1f(u_offsetX, offsetX);
     gl.uniform1f(u_offsetY, offsetY);
     
-    draw(gl);
+    draw();
+}
+
+function plotAreaResize() {
+    
+    canvas.width = $('#plotArea').width();
+    canvas.height = $('#plotArea').height();
+    
+    var n = initVertexBuffers();
+    if (n < 0) {
+        console.log('Failed to set the positions of the vertices');
+        return;
+    }
+    
+    draw();
 }
 
 function mouseWheel(event) {
@@ -233,26 +255,26 @@ function mouseWheel(event) {
     var zoomFactor = 1.0;
     
     if (event.deltaY > 0)
-        zoomFactor *= 1.02;
+        zoomFactor *= 1.03;
     else if (event.deltaY < 0)
-        zoomFactor *= 0.98;
+        zoomFactor *= 0.97;
     
     zoom *= zoomFactor;
     
-    offsetX += event.offsetX - (gl.drawingBufferWidth / 2);
-    offsetY += event.offsetY - (gl.drawingBufferHeight / 2);
+    offsetX += event.offsetX - (canvas.clientWidth / 2);
+    offsetY += event.offsetY - (canvas.clientHeight / 2);
     
     offsetX *= zoomFactor;
     offsetY *= zoomFactor;
     
-    offsetX -= event.offsetX - (gl.drawingBufferWidth / 2);
-    offsetY -= event.offsetY - (gl.drawingBufferHeight / 2);
+    offsetX -= event.offsetX - (canvas.clientWidth / 2);
+    offsetY -= event.offsetY - (canvas.clientHeight / 2);
     
     gl.uniform1f(u_offsetX, offsetX);
     gl.uniform1f(u_offsetY, offsetY);
     gl.uniform1f(u_zoom, zoom);
     
-    draw(gl);
+    draw();
     
     console.log('wheel');
     
@@ -261,16 +283,34 @@ function mouseWheel(event) {
 
 function grammarReady(grammar) {
     parser = PEG.buildParser(grammar);
+    
+    var hash = window.location.hash;
+    if (hash.length > 0) {
+        var expr = decodeURIComponent(hash.substring(1));
+        $('#expr').val(expr);
+        updateExpr(expr);
+    }
 }
 
-var parsedExprAst = null;
-
 function exprChange(event) {
+    
+    var newExpr = $(this).val().replace(/\s/g, '');
+    
+    if (newExpr === currExpr) {
+        return;
+    }
+    
+    updateExpr(newExpr);
+}
+
+function updateExpr(newExpr) {
+    
+    currExpr = newExpr;
+    
     $('#parseStatus').removeClass('ok error unknown');
     $('#ast').val('');
     
     if (parser) {
-        var newExpr = $(this).val();
         
         try {
             var parsedExprAst = parser.parse(newExpr);
@@ -284,11 +324,15 @@ function exprChange(event) {
             zoom = 1.0;
             
             updateShader(shaderExpr);
+            
+            var uriExpr = encodeURIComponent(currExpr);
+            window.location = '#' + uriExpr
         }
         catch (exp) {
+            console.log(exp);
             $('#parseStatus').addClass('error');
             $('#shaderExpression').val(exp);
-           return;
+            return;
         }
         
         $('#parseStatus').addClass('ok');
@@ -296,19 +340,19 @@ function exprChange(event) {
     else {
         $('#parseStatus').addClass('unknown');
     }
+
 }
 
 function updateShader(shaderExpr) {
     var shaderTxt = FSHADER_SOURCE.replace('{js_generated_expr}', shaderExpr.str);
     
-    // TODO: Dry this up.
     if (!initShaders(gl, VSHADER_SOURCE, shaderTxt)) {
         console.log('Failed to intialize shaders.');
     }
     
-    initVertexBuffers(gl);
+    initVertexBuffers();
     
-    draw(gl);
+    draw();
 }
 
 // Convert the abstract syntax tree created by the parser into a
@@ -394,6 +438,8 @@ var gl = {};
 var offsetX = 0.0;
 var offsetY = 0.0;
 var zoom = 1.0;
+var canvas = {};
+var currExpr = '';
 
 
 function draw() {
@@ -405,7 +451,7 @@ function draw() {
     
 }
 
-function initVertexBuffers(gl) {
+function initVertexBuffers() {
     var vertices = new Float32Array([ -1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0, -1.0, 1.0, 1.0, -1.0 ]);
     
     // Create a buffer object
@@ -430,14 +476,16 @@ function initVertexBuffers(gl) {
     
     gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
     
+    gl.viewport(0, 0, canvas.clientWidth, canvas.clientHeight);
+    
     u_width = getLocation('u_width');
     u_height = getLocation('u_height');
     u_offsetX = getLocation('u_offsetX');
     u_offsetY = getLocation('u_offsetY');
     u_zoom = getLocation('u_zoom');
     
-    gl.uniform1f(u_width, gl.drawingBufferWidth);
-    gl.uniform1f(u_height, gl.drawingBufferHeight);
+    gl.uniform1f(u_width, canvas.clientWidth);
+    gl.uniform1f(u_height, canvas.clientHeight);
     gl.uniform1f(u_offsetX, offsetX);
     gl.uniform1f(u_offsetY, offsetY);
     gl.uniform1f(u_zoom, zoom);
@@ -449,8 +497,7 @@ function initVertexBuffers(gl) {
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
 }
 
-function getLocation(varName)
-{
+function getLocation(varName) {
     var offset = gl.getUniformLocation(gl.program, varName);
     
     if (!offset)

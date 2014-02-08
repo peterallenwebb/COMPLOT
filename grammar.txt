@@ -60,5 +60,5 @@ uint "uint"
 = digits:[0-9]+ { return { type: "number", intPart: parseInt(digits.join("")), fracPart: 0}; }
 
 funcapp "funcapp"
-= funcName:("arg" / "sin" / "cos" / "tan" / "log" / "gamma") _ "(" _ additive:additive _ ")"
+= funcName:("re" / "im" / "arg" / "sin" / "cos" / "tan" / "log" / "gamma") _ "(" _ additive:additive _ ")"
 { return { type: "func", name: funcName, params: [ additive ] } }
