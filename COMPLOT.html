@@ -8,10 +8,10 @@
     <meta name="msapplication-TileColor" content="#da532c">
     <link href="COMPLOT.css" rel="stylesheet" />
 </head>
-<body>
+<body onload="createCOMPLOT()">
     <div id="plotArea">
         <canvas id="webgl">
-            Please use a browser that supports the canvas tag.
+            COMPLOT requires a browser that supports the canvas tag.
         </canvas>
         <div id="formulaArea">
             <span id="funcLabel">f(z) = </span>
@@ -33,7 +33,11 @@
     <script src="lib\peg-0.8.0.min.js"></script>
     <script src="COMPLOT.js"></script>
     <script type="text/javascript">
-        $(document).ready(main);
+        
+        function createCOMPLOT() {
+            var c = new COMPLOT(document.getElementById('webgl'));
+        }
+    
     </script>
 </body>
 </html>

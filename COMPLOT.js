@@ -3,6 +3,7 @@
 // TODO: Support for negating symbols
 // TODO: cSinh, cCosh
 
+function COMPLOT(canvas) {
 
 var VSHADER_SOURCE =
 'attribute vec4 a_Position;                                           \n' +
@@ -173,27 +174,304 @@ var FSHADER_SOURCE =
 '    gl_FragColor = getRgbaByArg(z);                                  \n' +
 '}                                                                    \n' +
 '                                                                     \n';
+    
+    var parser = null;
+    var dragging = false;
+    var dragStart = { x: 0, y: 0 };
+    var a_Position = 0;
+    var u_width = 0;
+    var u_height = 0;
+    var u_zoom = 0;
+    var u_offsetX = 0;
+    var u_offsetY = 0;
+    
+    var gl = {};
+    
+    // Amount to offset view window from origin-centered, in
+    // canvas pixels.
+    var offsetX = 0.0;
+    var offsetY = 0.0;
+    var zoom = 1.0;
+    var currExpr = '';
 
+    function mouseUp(event) {
+        dragging = false;
+    }
 
-var parser = null;
+    function mouseDown(event) {
+        dragging = true;
+        dragStart.x = event.offsetX;
+        dragStart.y = event.offsetY;
+    }
 
-function main() {
+    function mouseMove(event) {
+
+        if (dragging) {
+            offsetX += dragStart.x - event.offsetX;
+            offsetY += dragStart.y - event.offsetY;
+            dragStart.x = event.offsetX;
+            dragStart.y = event.offsetY;
+        }
+        
+        gl.uniform1f(u_offsetX, offsetX);
+        gl.uniform1f(u_offsetY, offsetY);
+        
+        draw();
+    }
+
+    function plotAreaResize() {
+        
+        canvas.width = $('#plotArea').width();
+        canvas.height = $('#plotArea').height();
+        
+        var n = initVertexBuffers();
+        if (n < 0) {
+            console.log('Failed to set the positions of the vertices');
+            return;
+        }
+        
+        draw();
+    }
+
+    function mouseWheel(event) {
+        
+        var zoomFactor = 1.0;
+        
+        if (event.deltaY > 0)
+            zoomFactor *= 1.03;
+        else if (event.deltaY < 0)
+            zoomFactor *= 0.97;
+        
+        zoom *= zoomFactor;
+        
+        offsetX += event.offsetX - (canvas.clientWidth / 2);
+        offsetY += event.offsetY - (canvas.clientHeight / 2);
+        
+        offsetX *= zoomFactor;
+        offsetY *= zoomFactor;
+        
+        offsetX -= event.offsetX - (canvas.clientWidth / 2);
+        offsetY -= event.offsetY - (canvas.clientHeight / 2);
+        
+        gl.uniform1f(u_offsetX, offsetX);
+        gl.uniform1f(u_offsetY, offsetY);
+        gl.uniform1f(u_zoom, zoom);
+        
+        draw();
+        
+        console.log('wheel');
+        
+        return false;
+    }
+
+    function grammarReady(grammar) {
+        parser = PEG.buildParser(grammar);
+        
+        var hash = window.location.hash;
+        if (hash.length > 0) {
+            var expr = decodeURIComponent(hash.substring(1));
+            $('#expr').val(expr);
+            updateExpr(expr);
+        }
+    }
+
+    function exprChange(event) {
+        
+        var newExpr = $(this).val().replace(/\s/g, '');
+        
+        if (newExpr === currExpr) {
+            return;
+        }
+        
+        updateExpr(newExpr);
+    }
+
+    function updateExpr(newExpr) {
+        
+        currExpr = newExpr;
+        
+        $('#parseStatus').removeClass('ok error unknown');
+        $('#ast').val('');
+        
+        if (parser) {
+            
+            try {
+                var parsedExprAst = parser.parse(newExpr);
+                $('#ast').val(JSON.stringify(parsedExprAst));
+                
+                var shaderExpr = astToShaderExpr(parsedExprAst);
+                $('#shaderExpression').val(JSON.stringify(shaderExpr));
+                
+                offsetX = 0.0;
+                offsetY = 0.0;
+                zoom = 1.0;
+                
+                updateShader(shaderExpr);
+                
+                var uriExpr = encodeURIComponent(currExpr);
+                window.location = '#' + uriExpr
+            }
+            catch (exp) {
+                console.log(exp);
+                $('#parseStatus').addClass('error');
+                $('#shaderExpression').val(exp);
+                return;
+            }
+            
+            $('#parseStatus').addClass('ok');
+        }
+        else {
+            $('#parseStatus').addClass('unknown');
+        }
+
+    }
+
+    function updateShader(shaderExpr) {
+        var shaderTxt = FSHADER_SOURCE.replace('{js_generated_expr}', shaderExpr.str);
+        
+        if (!initShaders(gl, VSHADER_SOURCE, shaderTxt)) {
+            console.log('Failed to intialize shaders.');
+        }
+        
+        initVertexBuffers();
+        
+        draw();
+    }
+
+    // Convert the abstract syntax tree created by the parser into a
+    // C-style expression in the shader language, and a list of the
+    // constants used in the expression.
+    function astToShaderExpr(ast) {
+        
+        if (ast.type === 'number') {
+            return { str: 'vec2(' + ast.intPart + '.' + ast.fracPart + ', 0.0)' };
+        } else if (ast.type === 'symbol') {
+            
+            switch (ast.name) {
+                case 'i':
+                    return { str: 'vec2(0.0, 1.0)' };
+                case 'z':
+                    return { str: 'z' };
+                case 'e':
+                    return { str: 'vec2(M_E, 0.0)' };
+                case 'pi':
+                    return { str: 'vec2(M_PI, 0.0)' };
+                default:
+                    var usedParams = {};
+                    usedParams[ast.name] = ast.name;
+                    return { 'usedParams': usedParams, str: 'u_Param' + ast.name };
+            }
+        } else if (ast.type === 'func') {
+            
+            if (ast.name === 'add' || ast.name === 'sub') {
+                var op = ast.name === 'add' ? '+' : '-';
+                var leftExpr = astToShaderExpr(ast.params[0]);
+                var rightExpr = astToShaderExpr(ast.params[1])
+                var sumStr = '(' +  leftExpr.str + op +  rightExpr.str + ')';
+                return { str: sumStr,
+                         usedParams: { } };// TODO: Param merge
+            }
+            else {
+                return getStdFuncExpr(ast);
+            }
+        }
+        
+        throw 'Unexpected node type found in abstract syntax tree.';
+    }
+
+    function getStdFuncExpr(ast) {
+        var shaderFuncName = 'c' + ast.name.charAt(0).toUpperCase() + ast.name.slice(1);
+        
+        var paramsString = '';
+        var usedParams = [];
+        
+        var first = true;
+        for (var paramIdx in ast.params) {
+            var paramExpr = astToShaderExpr(ast.params[paramIdx]);
+            
+            if (first === false)
+                paramsString = paramsString + ', ';
+            
+            paramsString += paramExpr.str;
+            
+            if (paramExpr.usedParams) {
+                for (var exprParamIdx in paramExpr.usedParams) {
+                    usedParams[exprParamIdx] = exprParamIdx;
+                }
+            }
+            
+            first = false;
+        }
+        
+        return { usedParams: usedParams,
+            str: shaderFuncName + '(' + paramsString + ')' };
+    }
+
+    function draw() {
+        gl.clearColor(0, 0, 0, 1.0);
+        
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        
+    }
+
+    function initVertexBuffers() {
+        var vertices = new Float32Array([ -1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0, -1.0, 1.0, 1.0, -1.0 ]);
+        
+        // Create a buffer object
+        var vertexBuffer = gl.createBuffer();
+        if (!vertexBuffer) {
+            console.log('Failed to create the buffer object');
+            return -1;
+        }
+        
+        // Bind the buffer object to target
+        gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+        
+        // Write date into the buffer object
+        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+        
+        // Pass the position of a point to a_Position variable
+        a_Position = gl.getAttribLocation(gl.program, 'a_Position');
+        if (a_Position < 0) {
+            console.log('Failed to get the storage location of a_Position');
+            return -1;
+        }
+        
+        gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
+        
+        gl.viewport(0, 0, canvas.clientWidth, canvas.clientHeight);
+        
+        u_width = getLocation('u_width');
+        u_height = getLocation('u_height');
+        u_offsetX = getLocation('u_offsetX');
+        u_offsetY = getLocation('u_offsetY');
+        u_zoom = getLocation('u_zoom');
+        
+        gl.uniform1f(u_width, canvas.clientWidth);
+        gl.uniform1f(u_height, canvas.clientHeight);
+        gl.uniform1f(u_offsetX, offsetX);
+        gl.uniform1f(u_offsetY, offsetY);
+        gl.uniform1f(u_zoom, zoom);
+         
+        // Enable the generic vertex attribute array
+        gl.enableVertexAttribArray(a_Position);
+        
+        // Unbind the buffer object
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    }
+
+    function getLocation(varName) {
+        var offset = gl.getUniformLocation(gl.program, varName);
+        
+        if (!offset)
+            throw 'Failed to get the storage location of ' + varName;
+        
+        return offset;
+    }
     
     jQuery.get('grammar.txt', function(data) { grammarReady(data); });
-
-    canvas = document.getElementById('webgl');
-    
-    $('#expr').on('change keyup paste', exprChange);
-    
-    $(document).mousemove(mouseMove);
-    $(document).mouseup(mouseUp);
-    $('#webgl').mousedown(mouseDown);
-    $('#webgl').mousewheel(mouseWheel);
-    
-    $(window).resize(plotAreaResize);
-    
-    // Prevent change to text-selection "i-beam" cursor on mouse down.
-    canvas.onselectstart = function() { return false; }
     
     gl = getWebGLContext(canvas, { antialias: true });
     if (!gl) {
@@ -201,307 +479,21 @@ function main() {
         return;
     }
     
+    $('#expr').on('change keyup paste', exprChange);
+        
+    $(document).mousemove(mouseMove);
+    $(document).mouseup(mouseUp);
+    $(canvas).mousedown(mouseDown);
+    $(canvas).mousewheel(mouseWheel);
+        
+    $(window).resize(plotAreaResize);
+        
+    // Prevent change to text-selection "i-beam" cursor on mouse down.
+    canvas.onselectstart = function() { return false; }
+        
     if (!initShaders(gl, VSHADER_SOURCE, FSHADER_SOURCE.replace('{js_generated_expr}', 'z'))) {
         console.log('Failed to intialize shaders.');
     }
     
     plotAreaResize();
-}
-
-var dragging = false;
-var dragStart = { x: 0, y: 0 };
-
-function mouseUp(event) {
-    dragging = false;
-}
-
-function mouseDown(event) {
-    dragging = true;
-    dragStart.x = event.offsetX;
-    dragStart.y = event.offsetY;
-}
-
-function mouseMove(event) {
-
-    if (dragging) {
-        offsetX += dragStart.x - event.offsetX;
-        offsetY += dragStart.y - event.offsetY;
-        dragStart.x = event.offsetX;
-        dragStart.y = event.offsetY;
-    }
-    
-    gl.uniform1f(u_offsetX, offsetX);
-    gl.uniform1f(u_offsetY, offsetY);
-    
-    draw();
-}
-
-function plotAreaResize() {
-    
-    canvas.width = $('#plotArea').width();
-    canvas.height = $('#plotArea').height();
-    
-    var n = initVertexBuffers();
-    if (n < 0) {
-        console.log('Failed to set the positions of the vertices');
-        return;
-    }
-    
-    draw();
-}
-
-function mouseWheel(event) {
-    
-    var zoomFactor = 1.0;
-    
-    if (event.deltaY > 0)
-        zoomFactor *= 1.03;
-    else if (event.deltaY < 0)
-        zoomFactor *= 0.97;
-    
-    zoom *= zoomFactor;
-    
-    offsetX += event.offsetX - (canvas.clientWidth / 2);
-    offsetY += event.offsetY - (canvas.clientHeight / 2);
-    
-    offsetX *= zoomFactor;
-    offsetY *= zoomFactor;
-    
-    offsetX -= event.offsetX - (canvas.clientWidth / 2);
-    offsetY -= event.offsetY - (canvas.clientHeight / 2);
-    
-    gl.uniform1f(u_offsetX, offsetX);
-    gl.uniform1f(u_offsetY, offsetY);
-    gl.uniform1f(u_zoom, zoom);
-    
-    draw();
-    
-    console.log('wheel');
-    
-    return false;
-}
-
-function grammarReady(grammar) {
-    parser = PEG.buildParser(grammar);
-    
-    var hash = window.location.hash;
-    if (hash.length > 0) {
-        var expr = decodeURIComponent(hash.substring(1));
-        $('#expr').val(expr);
-        updateExpr(expr);
-    }
-}
-
-function exprChange(event) {
-    
-    var newExpr = $(this).val().replace(/\s/g, '');
-    
-    if (newExpr === currExpr) {
-        return;
-    }
-    
-    updateExpr(newExpr);
-}
-
-function updateExpr(newExpr) {
-    
-    currExpr = newExpr;
-    
-    $('#parseStatus').removeClass('ok error unknown');
-    $('#ast').val('');
-    
-    if (parser) {
-        
-        try {
-            var parsedExprAst = parser.parse(newExpr);
-            $('#ast').val(JSON.stringify(parsedExprAst));
-            
-            var shaderExpr = astToShaderExpr(parsedExprAst);
-            $('#shaderExpression').val(JSON.stringify(shaderExpr));
-            
-            offsetX = 0.0;
-            offsetY = 0.0;
-            zoom = 1.0;
-            
-            updateShader(shaderExpr);
-            
-            var uriExpr = encodeURIComponent(currExpr);
-            window.location = '#' + uriExpr
-        }
-        catch (exp) {
-            console.log(exp);
-            $('#parseStatus').addClass('error');
-            $('#shaderExpression').val(exp);
-            return;
-        }
-        
-        $('#parseStatus').addClass('ok');
-    }
-    else {
-        $('#parseStatus').addClass('unknown');
-    }
-
-}
-
-function updateShader(shaderExpr) {
-    var shaderTxt = FSHADER_SOURCE.replace('{js_generated_expr}', shaderExpr.str);
-    
-    if (!initShaders(gl, VSHADER_SOURCE, shaderTxt)) {
-        console.log('Failed to intialize shaders.');
-    }
-    
-    initVertexBuffers();
-    
-    draw();
-}
-
-// Convert the abstract syntax tree created by the parser into a
-// C-style expression in the shader language, and a list of the
-// constants used in the expression.
-function astToShaderExpr(ast) {
-    
-    if (ast.type === 'number') {
-        return { str: 'vec2(' + ast.intPart + '.' + ast.fracPart + ', 0.0)' };
-    } else if (ast.type === 'symbol') {
-        
-        switch (ast.name) {
-            case 'i':
-                return { str: 'vec2(0.0, 1.0)' };
-            case 'z':
-                return { str: 'z' };
-            case 'e':
-                return { str: 'vec2(M_E, 0.0)' };
-            case 'pi':
-                return { str: 'vec2(M_PI, 0.0)' };
-            default:
-                var usedParams = {};
-                usedParams[ast.name] = ast.name;
-                return { 'usedParams': usedParams, str: 'u_Param' + ast.name };
-        }
-    } else if (ast.type === 'func') {
-        
-        if (ast.name === 'add' || ast.name === 'sub') {
-            var op = ast.name === 'add' ? '+' : '-';
-            var leftExpr = astToShaderExpr(ast.params[0]);
-            var rightExpr = astToShaderExpr(ast.params[1])
-            var sumStr = '(' +  leftExpr.str + op +  rightExpr.str + ')';
-            return { str: sumStr,
-                     usedParams: { } };// TODO: Param merge
-        }
-        else {
-            return getStdFuncExpr(ast);
-        }
-    }
-    
-    throw 'Unexpected node type found in abstract syntax tree.';
-}
-
-function getStdFuncExpr(ast) {
-    var shaderFuncName = 'c' + ast.name.charAt(0).toUpperCase() + ast.name.slice(1);
-    
-    var paramsString = '';
-    var usedParams = [];
-    
-    var first = true;
-    for (var paramIdx in ast.params) {
-        var paramExpr = astToShaderExpr(ast.params[paramIdx]);
-        
-        if (first === false)
-            paramsString = paramsString + ', ';
-        
-        paramsString += paramExpr.str;
-        
-        if (paramExpr.usedParams) {
-            for (var exprParamIdx in paramExpr.usedParams) {
-                usedParams[exprParamIdx] = exprParamIdx;
-            }
-        }
-        
-        first = false;
-    }
-    
-    return { usedParams: usedParams,
-        str: shaderFuncName + '(' + paramsString + ')' };
-}
-
-var a_Position = 0;
-var u_width = 0;
-var u_height = 0;
-var u_zoom = 0;
-var u_offsetX = 0;
-var u_offsetY = 0;
-
-var gl = {};
-
-// Amount to offset view window from origin-centered, in
-// canvas pixels.
-var offsetX = 0.0;
-var offsetY = 0.0;
-var zoom = 1.0;
-var canvas = {};
-var currExpr = '';
-
-
-function draw() {
-    gl.clearColor(0, 0, 0, 1.0);
-    
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-    
-}
-
-function initVertexBuffers() {
-    var vertices = new Float32Array([ -1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0, -1.0, 1.0, 1.0, -1.0 ]);
-    
-    // Create a buffer object
-    var vertexBuffer = gl.createBuffer();
-    if (!vertexBuffer) {
-        console.log('Failed to create the buffer object');
-        return -1;
-    }
-    
-    // Bind the buffer object to target
-    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-    
-    // Write date into the buffer object
-    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-    
-    // Pass the position of a point to a_Position variable
-    a_Position = gl.getAttribLocation(gl.program, 'a_Position');
-    if (a_Position < 0) {
-        console.log('Failed to get the storage location of a_Position');
-        return -1;
-    }
-    
-    gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
-    
-    gl.viewport(0, 0, canvas.clientWidth, canvas.clientHeight);
-    
-    u_width = getLocation('u_width');
-    u_height = getLocation('u_height');
-    u_offsetX = getLocation('u_offsetX');
-    u_offsetY = getLocation('u_offsetY');
-    u_zoom = getLocation('u_zoom');
-    
-    gl.uniform1f(u_width, canvas.clientWidth);
-    gl.uniform1f(u_height, canvas.clientHeight);
-    gl.uniform1f(u_offsetX, offsetX);
-    gl.uniform1f(u_offsetY, offsetY);
-    gl.uniform1f(u_zoom, zoom);
-     
-    // Enable the generic vertex attribute array
-    gl.enableVertexAttribArray(a_Position);
-    
-    // Unbind the buffer object
-    gl.bindBuffer(gl.ARRAY_BUFFER, null);
-}
-
-function getLocation(varName) {
-    var offset = gl.getUniformLocation(gl.program, varName);
-    
-    if (!offset)
-        throw 'Failed to get the storage location of ' + varName;
-    
-    return offset;
 }
