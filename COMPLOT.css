@@ -28,16 +28,21 @@ body
 
 #formulaArea
 {
+    padding: 3px 6px 3px 6px;
+}
+
+#sidebar
+{
     position: absolute;
     top: 0px;
     left: 0px;
-    padding: 3px 6px 3px 6px;
-    background-color: #000000;
-    font-family: Helvetica, Arial, serif;}
+    background-color: #383838;
+    color: white;
+    font-family: Helvetica, Arial, serif;
+}
 
 #funcLabel
 {
-    color: white;
     font-family: Helvetica, Arial, serif;
 }
 

@@ -1,9 +1,7 @@
 
-// TODO: Interpret hash portion of URL as formula for linking
 // TODO: Support for negating symbols
-// TODO: cSinh, cCosh
 
-function COMPLOT(canvas) {
+function COMPLOT(canvas, hostElem) {
 
 var VSHADER_SOURCE =
 'attribute vec4 a_Position;                                           \n' +
@@ -21,7 +19,7 @@ var FSHADER_SOURCE =
 'uniform float u_offsetX;                                             \n' +
 'uniform float u_offsetY;                                             \n' +
 'uniform float u_zoom;                                                \n' +
-
+    
 'vec4 getRgbaByArg(vec2 c)                                            \n' +
 '{                                                                    \n' +
 '    float sixAngle = (atan(c.y, c.x) + M_PI) / M_PI * 3.0;           \n' +
@@ -91,6 +89,16 @@ var FSHADER_SOURCE =
 '                -1.0 * sin(z.x) * (eTozy - eToNegzy)) / 2.0;         \n' +
 '}                                                                    \n' +
 
+'vec2 cSinh(vec2 z)                                                   \n' +
+'{                                                                    \n' +
+'    return (cExp(z) - cExp(-z)) / 2.0;                               \n' +
+'}                                                                    \n' +
+    
+'vec2 cCosh(vec2 z)                                                   \n' +
+'{                                                                    \n' +
+'    return (cExp(z) + cExp(-z)) / 2.0;                               \n' +
+'}                                                                    \n' +
+    
 'vec2 cTan(vec2 z)                                                    \n' +
 '{                                                                    \n' +
 '    return cDiv(cSin(z), cCos(z));                                   \n' +
@@ -119,7 +127,7 @@ var FSHADER_SOURCE =
 
 'vec2 cIm(vec2 z)                                                     \n' +
 '{                                                                    \n' +
-'    return vec2(0.0, z.y);                                           \n' +
+'    return vec2(z.y, 0.0);                                           \n' +
 '}                                                                    \n' +
 
 // Gamma implementation based on Lanczos approximation. Adapted from
@@ -169,15 +177,19 @@ var FSHADER_SOURCE =
 '                                                                     \n' +
 '    z /= u_zoom / 30.0;                                              \n' +
 '                                                                     \n' +
-'    z = {js_generated_expr};                                         \n' +
 '                                                                     \n' +
-'    gl_FragColor = getRgbaByArg(z);                                  \n' +
+'    vec2 z_n = vec2(0.0, 0.0);                                       \n' +
+'    for (int i = 0; i < {iteration_count}; i++)                      \n' +
+'        z_n = {js_generated_expr};                                   \n' +
+'                                                                     \n' +
+'    gl_FragColor = getRgbaByArg(z_n);                                  \n' +
 '}                                                                    \n' +
 '                                                                     \n';
     
     var parser = null;
     var dragging = false;
     var dragStart = { x: 0, y: 0 };
+    var iterations = 1;
     var a_Position = 0;
     var u_width = 0;
     var u_height = 0;
@@ -193,6 +205,7 @@ var FSHADER_SOURCE =
     var offsetY = 0.0;
     var zoom = 1.0;
     var currExpr = '';
+    var currShaderExpr = '';
 
     function mouseUp(event) {
         dragging = false;
@@ -285,6 +298,11 @@ var FSHADER_SOURCE =
         
         updateExpr(newExpr);
     }
+    
+    function iterationsChange(event) {
+        iterations = Number($(this).val());
+        updateShader();
+    }
 
     function updateExpr(newExpr) {
         
@@ -306,7 +324,8 @@ var FSHADER_SOURCE =
                 offsetY = 0.0;
                 zoom = 1.0;
                 
-                updateShader(shaderExpr);
+                currShaderExpr = shaderExpr;
+                updateShader();
                 
                 var uriExpr = encodeURIComponent(currExpr);
                 window.location = '#' + uriExpr
@@ -326,8 +345,11 @@ var FSHADER_SOURCE =
 
     }
 
-    function updateShader(shaderExpr) {
-        var shaderTxt = FSHADER_SOURCE.replace('{js_generated_expr}', shaderExpr.str);
+    function updateShader() {
+        
+        var shaderTxt =
+            FSHADER_SOURCE.replace('{js_generated_expr}', currShaderExpr.str)
+                          .replace('{iteration_count}', iterations);
         
         if (!initShaders(gl, VSHADER_SOURCE, shaderTxt)) {
             console.log('Failed to intialize shaders.');
@@ -352,6 +374,8 @@ var FSHADER_SOURCE =
                     return { str: 'vec2(0.0, 1.0)' };
                 case 'z':
                     return { str: 'z' };
+                case 'z_n':
+                    return { str: 'z_n' };
                 case 'e':
                     return { str: 'vec2(M_E, 0.0)' };
                 case 'pi':
@@ -487,13 +511,19 @@ var FSHADER_SOURCE =
     $(canvas).mousewheel(mouseWheel);
         
     $(window).resize(plotAreaResize);
-        
+    
+    $('#iterations').val(iterations);
+    $('#iterations').on('change keyup paste', iterationsChange);
+    
     // Prevent change to text-selection "i-beam" cursor on mouse down.
     canvas.onselectstart = function() { return false; }
         
     if (!initShaders(gl, VSHADER_SOURCE, FSHADER_SOURCE.replace('{js_generated_expr}', 'z'))) {
         console.log('Failed to intialize shaders.');
     }
+    
+    // var paramWidgetA = new COMPLOT.ParamWidget($(hostElem).find('#sidebar'));
+    
     
     plotAreaResize();
 }
