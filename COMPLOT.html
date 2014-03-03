@@ -13,10 +13,13 @@
         <canvas id="webgl">
             COMPLOT requires a browser that supports the canvas tag.
         </canvas>
+        <div id="sidebar">
         <div id="formulaArea">
             <span id="funcLabel">f(z) = </span>
             <input type="text" id="expr" name="expr" />
             <output id="parseStatus" class="unknown"></output>
+        </div>
+        <div>Iterate n=<input type="number" id="iterations" name="iterations" min="1" max="20"> times</div>
         </div>
     </div>
     
@@ -32,10 +35,12 @@
     <script src="lib\cuon-utils.js"></script>
     <script src="lib\peg-0.8.0.min.js"></script>
     <script src="COMPLOT.js"></script>
+    <script src="param_widget.js"></script>
     <script type="text/javascript">
         
         function createCOMPLOT() {
-            var c = new COMPLOT(document.getElementById('webgl'));
+            var c = new COMPLOT(document.getElementById('webgl'),
+                                document.getElementById('plotArea'));
         }
     
     </script>

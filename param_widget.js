@@ -8,12 +8,12 @@ COMPLOT.ParamWidget = function(hostElement) {
     var imgVal = 0.0;
     
     function realChange() {
-        realVal = this.value / 50.00 + 1.0;
+        realVal = this.value / 50.00 - 1.0;
         raiseChange();
     }
     
     function imgChange() {
-        imgVale = this.value / 50.00 + 1.0;
+        imgVal = this.value / 50.00 - 1.0;
         raiseChange();
     }
     

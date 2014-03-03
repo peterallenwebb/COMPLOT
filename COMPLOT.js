@@ -12,13 +12,14 @@ var VSHADER_SOURCE =
 
 var FSHADER_SOURCE =
 '#define M_PI 3.1415926535897932384626433832795                       \n' +
-'#define M_E 2.71828182845904523536028747135266                       \n' +
+'#define M_E  2.71828182845904523536028747135266                      \n' +
 'precision highp float;                                               \n' +
 'uniform float u_width;                                               \n' +
 'uniform float u_height;                                              \n' +
 'uniform float u_offsetX;                                             \n' +
 'uniform float u_offsetY;                                             \n' +
 'uniform float u_zoom;                                                \n' +
+'uniform vec2 u_paramA;                                              \n' +
     
 'vec4 getRgbaByArg(vec2 c)                                            \n' +
 '{                                                                    \n' +
@@ -190,12 +191,15 @@ var FSHADER_SOURCE =
     var dragging = false;
     var dragStart = { x: 0, y: 0 };
     var iterations = 1;
+    
+    // WebGL pointers to shader variables
     var a_Position = 0;
     var u_width = 0;
     var u_height = 0;
     var u_zoom = 0;
     var u_offsetX = 0;
     var u_offsetY = 0;
+    var u_paramA = 0;
     
     var gl = {};
     
@@ -203,7 +207,9 @@ var FSHADER_SOURCE =
     // canvas pixels.
     var offsetX = 0.0;
     var offsetY = 0.0;
+    
     var zoom = 1.0;
+    
     var currExpr = '';
     var currShaderExpr = '';
 
@@ -303,6 +309,11 @@ var FSHADER_SOURCE =
         iterations = Number($(this).val());
         updateShader();
     }
+    
+    function paramChange(newVal) {
+        gl.uniform2f(u_paramA, newVal.real, newVal.img);
+        draw();
+    }
 
     function updateExpr(newExpr) {
         
@@ -376,6 +387,8 @@ var FSHADER_SOURCE =
                     return { str: 'z' };
                 case 'z_n':
                     return { str: 'z_n' };
+                case 'A':
+                    return { str: 'u_paramA' };
                 case 'e':
                     return { str: 'vec2(M_E, 0.0)' };
                 case 'pi':
@@ -472,13 +485,15 @@ var FSHADER_SOURCE =
         u_offsetX = getLocation('u_offsetX');
         u_offsetY = getLocation('u_offsetY');
         u_zoom = getLocation('u_zoom');
+        u_paramA = getLocation('u_paramA');
         
         gl.uniform1f(u_width, canvas.clientWidth);
         gl.uniform1f(u_height, canvas.clientHeight);
         gl.uniform1f(u_offsetX, offsetX);
         gl.uniform1f(u_offsetY, offsetY);
         gl.uniform1f(u_zoom, zoom);
-         
+        gl.uniform2f(u_paramA, 0.0, 0.0);
+        
         // Enable the generic vertex attribute array
         gl.enableVertexAttribArray(a_Position);
         
@@ -522,8 +537,8 @@ var FSHADER_SOURCE =
         console.log('Failed to intialize shaders.');
     }
     
-    // var paramWidgetA = new COMPLOT.ParamWidget($(hostElem).find('#sidebar'));
-    
+    var paramWidgetA = new COMPLOT.ParamWidget($(hostElem).find('#sidebar'));
+    paramWidgetA.onChange(paramChange);
     
     plotAreaResize();
 }
