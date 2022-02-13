@@ -1,217 +1,214 @@
-
-// TODO: Support for negating symbols
-
 function COMPLOT(canvas, hostElem) {
 
-var VSHADER_SOURCE =
-'attribute vec4 a_Position;                                           \n' +
-'void main()                                                          \n' +
-'{                                                                    \n' +
-'  gl_Position = a_Position;                                          \n' +
-'}                                                                    \n';
+    // Inelegantly include the WebGL vertex shader source code as a sting...
+    var VSHADER_SOURCE =
+    'attribute vec4 a_Position;                                           \n' +
+    'void main()                                                          \n' +
+    '{                                                                    \n' +
+    '  gl_Position = a_Position;                                          \n' +
+    '}                                                                    \n';
 
-var FSHADER_SOURCE =
-'#define M_PI 3.1415926535897932384626433832795                       \n' +
-'#define M_E  2.71828182845904523536028747135266                      \n' +
-'precision highp float;                                               \n' +
-'uniform float u_width;                                               \n' +
-'uniform float u_height;                                              \n' +
-'uniform float u_offsetX;                                             \n' +
-'uniform float u_offsetY;                                             \n' +
-'uniform float u_zoom;                                                \n' +
-'uniform vec2 u_paramA;                                              \n' +
+    // ...and do the same for the much more interesting fragment shader.
+    var FSHADER_SOURCE =
+    '#define M_PI 3.1415926535897932384626433832795                       \n' +
+    '#define M_E  2.71828182845904523536028747135266                      \n' +
+    'precision highp float;                                               \n' +
+    'uniform float u_width;                                               \n' +
+    'uniform float u_height;                                              \n' +
+    'uniform float u_offsetX;                                             \n' +
+    'uniform float u_offsetY;                                             \n' +
+    'uniform float u_zoom;                                                \n' +
+//    'uniform vec2 u_paramA;                                              \n' +
+    '\n' +
+    'vec4 getRgbaByArg(vec2 c)                                            \n' +
+    '{                                                                    \n' +
+    '    float sixAngle = (atan(c.y, c.x) + M_PI) / M_PI * 3.0;           \n' +
+    '    vec4 rgba;                                                       \n' +
+    '    if (sixAngle < 1.0) rgba = vec4(1.0, sixAngle, 0.0, 1.0);        \n' +
+    '    else if (sixAngle < 2.0) rgba = vec4(2.0 - sixAngle, 1.0, 0.0, 1.0);  \n' +
+    '    else if (sixAngle < 3.0) rgba = vec4(0.0, 1.0, sixAngle - 2.0, 1.0);  \n' +
+    '    else if (sixAngle < 4.0) rgba = vec4(0.0, 4.0 - sixAngle, 1.0, 1.0);  \n' +
+    '    else if (sixAngle < 5.0) rgba = vec4(sixAngle - 4.0, 0.0, 1.0, 1.0);  \n' +
+    '    else rgba = vec4(1.0, 0.0, 6.0 - sixAngle, 1.0);                 \n' +
+    '                                                                     \n' +
+    '    if (dot(c, c) < 0.00390625)                                      \n' +
+    '        rgba *= 0.8;                                                 \n' +
+    '                                                                     \n' +
+    '    if (dot(c, c) > 1.0 - 0.05 && dot(c, c) < 1.0 + 0.05)            \n' +
+    '        rgba *= 0.8;                                                 \n' +
+    '    c = c * 5.0;                                                                 \n' +
+    '    float rFloor = c.x - mod(c.x, 1.0);                              \n' +
+    '    float iFloor = c.y - mod(c.y, 1.0);                              \n' +
+    '                                                                     \n' +
+    '    if (mod(rFloor + iFloor, 2.0) == 0.0)                            \n' +
+    '        rgba *= 0.8;                                                 \n' +
+    '                                                                     \n' +
+    '    rgba[3] = 1.0;                                                   \n' +
+    '                                                                     \n' +
+    '    return rgba;                                                     \n' +
+    '}                                                                    \n' +
+    '\n' +
+    'vec2 cMult(vec2 z1, vec2 z2)                                         \n' +
+    '{                                                                    \n' +
+    '    return vec2(z1.x * z2.x - z1.y * z2.y,                           \n' +
+    '                z1.x * z2.y + z1.y * z2.x);                          \n' +
+    '}                                                                    \n' +
+    '\n' +
+    'vec2 cDiv(vec2 z1, vec2 z2)                                          \n' +
+    '{                                                                    \n' +
+    '    float z2Mag2 = dot(z2, z2);                                      \n' +
+    '    return vec2(dot(z1, z2),                                         \n' +
+    '                z1.y * z2.x - z1.x * z2.y) / z2Mag2;                 \n' +
+    '}                                                                    \n' +
+    '\n' +
+    'vec2 cExp(vec2 z)                                                    \n' +
+    '{                                                                    \n' +
+    '    float rFact = pow(M_E, z.x);                                     \n' +
+    '    vec2 cFact = vec2(cos(z.y), sin(z.y));                           \n' +
+    '    return rFact * cFact;                                            \n' +
+    '}                                                                    \n' +
+    '\n' +
+    'vec2 cArg(vec2 z)                                                    \n' +
+    '{                                                                    \n' +
+    '    return vec2(atan(z.y, z.x), 0.0);                                \n' +
+    '}                                                                    \n' +
+    '\n' +
+    'vec2 cSin(vec2 z)                                                    \n' +
+    '{                                                                    \n' +
+    '    float eTozy = pow(M_E, z.y);                                     \n' +
+    '    float eToNegzy = pow(M_E, -z.y);                                 \n' +
+    '    return vec2(sin(z.x) * (eTozy + eToNegzy),                       \n' +
+    '                cos(z.x) * (eTozy - eToNegzy)) / 2.0;                \n' +
+    '}                                                                    \n' +
+    '\n' +
+    'vec2 cCos(vec2 z)                                                    \n' +
+    '{                                                                    \n' +
+    '    float eTozy = pow(M_E, z.y);                                     \n' +
+    '    float eToNegzy = pow(M_E, -z.y);                                 \n' +
+    '    return vec2(cos(z.x) * (eTozy + eToNegzy),                       \n' +
+    '                -1.0 * sin(z.x) * (eTozy - eToNegzy)) / 2.0;         \n' +
+    '}                                                                    \n' +
+    '\n' +
+    'vec2 cSinh(vec2 z)                                                   \n' +
+    '{                                                                    \n' +
+    '    return (cExp(z) - cExp(-z)) / 2.0;                               \n' +
+    '}                                                                    \n' +
+    '\n' +
+    'vec2 cCosh(vec2 z)                                                   \n' +
+    '{                                                                    \n' +
+    '    return (cExp(z) + cExp(-z)) / 2.0;                               \n' +
+    '}                                                                    \n' +
+    '\n' +
+    'vec2 cTan(vec2 z)                                                    \n' +
+    '{                                                                    \n' +
+    '    return cDiv(cSin(z), cCos(z));                                   \n' +
+    '}                                                                    \n' +
+    '\n' +
+    'vec2 cLog(vec2 z)                                                    \n' +
+    '{                                                                    \n' +
+    '    return vec2(log(sqrt(dot(z, z))),                                \n' +
+    '                cArg(z).x);                                          \n' +
+    '}                                                                    \n' +
+    '\n' +
+    'vec2 cPow(vec2 z, vec2 c)                                            \n' +
+    '{                                                                    \n' +
+    '    return cExp(cMult(c, cLog(z)));                                  \n' +
+    '}                                                                    \n' +
+    '\n' +
+    'vec2 cMag(vec2 z)                                                    \n' +
+    '{                                                                    \n' +
+    '    return vec2(sqrt(dot(z, z)), 0.0);                               \n' +
+    '}                                                                    \n' +
+    '\n' +
+    'vec2 cRe(vec2 z)                                                     \n' +
+    '{                                                                    \n' +
+    '    return vec2(z.x, 0.0);                                           \n' +
+    '}                                                                    \n' +
+    '\n' +
+    'vec2 cIm(vec2 z)                                                     \n' +
+    '{                                                                    \n' +
+    '    return vec2(z.y, 0.0);                                           \n' +
+    '}                                                                    \n' +
+    '\n' +
+    // Gamma function implementation based on Lanczos approximation. Adapted from
+    // python code in Wikipedia entry on Lanczos.
+    'vec2 cGamma(vec2 z)                                                    \n' +
+    '{                                                                      \n' +
+    '    float p[9];                                                        \n' +
+    '    p[0] = 0.99999999999980993;                                        \n' +
+    '    p[1] = 676.5203681218851;                                          \n' +
+    '    p[2] = -1259.1392167224028;                                        \n' +
+    '    p[3] = 771.32342877765313;                                         \n' +
+    '    p[4] = -176.61502916214059;                                        \n' +
+    '    p[5] = 12.507343278686905;                                         \n' +
+    '    p[6] = -0.13857109526572012;                                       \n' +
+    '    p[7] = 9.9843695780195716e-6;                                      \n' +
+    '    p[8] = 1.5056327351493116e-7;                                      \n' +
+    '\n' +
+    '    bool reflected = false;                                            \n' +
+    '    vec2 origZ = z;                                                    \n' +
+    '    if (z.x < 0.5)                                                     \n' +
+    '    {                                                                  \n' +
+    '        z = vec2(1.0, 0.0) - z;                                        \n' +
+    '        reflected = true;                                              \n' +
+    '    }                                                                  \n' +
+    '\n' +
+    '    z -= vec2(1.0, 0.0);                                               \n' +
+    '\n' +
+    '    vec2 x = vec2(p[0], 0.0);                                          \n' +
+    '    for (int i = 1; i < 9; i++)                                        \n' +
+    '    {                                                                  \n' +
+    '        x += cDiv(vec2(p[i], 0.0), z + vec2(float(i), 0.0));           \n' +
+    '    }                                                                  \n' +
+    '\n' +
+    '    vec2 t = z + vec2(7.5, 0.0);                                       \n' +
+    '    vec2 result = cMult(cMult(sqrt(2.0 * M_PI) * cPow(t, z + vec2(0.5, 0.0)), cExp(-t)), x); \n' +
+    '\n' +
+    '    if (!reflected)                                                    \n' +
+    '        return result;                                                 \n' +
+    '    else                                                               \n' +
+    '        return cDiv(vec2(M_PI, 0.0), cMult(cSin(M_PI * origZ), result));                \n' +
+    '}                                                                    \n' +
+    'void main()                                                          \n' +
+    '{                                                                    \n' +
+    '    vec2 z = vec2((gl_FragCoord.x + u_offsetX) / u_width - 0.5,      \n' +
+    '                  (u_height/u_width) * (0.5 - (gl_FragCoord.y - u_offsetY) / u_height)); \n' +
+    '                                                                     \n' +
+    '    z /= u_zoom / 30.0;                                              \n' +
+    '                                                                     \n' +
+    '    vec2 z_n = vec2(0.0, 0.0);                                       \n' +
+    '    for (int i = 0; i < {iteration_count}; i++)                      \n' +
+    '        z_n = {js_generated_expr};                                   \n' +
+    '                                                                     \n' +
+    '    gl_FragColor = getRgbaByArg(z_n);                                  \n' +
+    '}                                                                    \n' +
+    '                                                                     \n';
     
-'vec4 getRgbaByArg(vec2 c)                                            \n' +
-'{                                                                    \n' +
-'    float sixAngle = (atan(c.y, c.x) + M_PI) / M_PI * 3.0;           \n' +
-'    vec4 rgba;                                                       \n' +
-'    if (sixAngle < 1.0) rgba = vec4(1.0, sixAngle, 0.0, 1.0);        \n' +
-'    else if (sixAngle < 2.0) rgba = vec4(2.0 - sixAngle, 1.0, 0.0, 1.0);  \n' +
-'    else if (sixAngle < 3.0) rgba = vec4(0.0, 1.0, sixAngle - 2.0, 1.0);  \n' +
-'    else if (sixAngle < 4.0) rgba = vec4(0.0, 4.0 - sixAngle, 1.0, 1.0);  \n' +
-'    else if (sixAngle < 5.0) rgba = vec4(sixAngle - 4.0, 0.0, 1.0, 1.0);  \n' +
-'    else rgba = vec4(1.0, 0.0, 6.0 - sixAngle, 1.0);                 \n' +
-'                                                                     \n' +
-'    if (dot(c, c) < 0.00390625)                                      \n' +
-'        rgba *= 0.8;                                                 \n' +
-'                                                                     \n' +
-'    if (dot(c, c) > 1.0 - 0.05 && dot(c, c) < 1.0 + 0.05)            \n' +
-'        rgba *= 0.8;                                                 \n' +
-'    c = c * 5.0;                                                                 \n' +
-'    float rFloor = c.x - mod(c.x, 1.0);                              \n' +
-'    float iFloor = c.y - mod(c.y, 1.0);                              \n' +
-'                                                                     \n' +
-'    if (mod(rFloor + iFloor, 2.0) == 0.0)                            \n' +
-'        rgba *= 0.8;                                                 \n' +
-'                                                                     \n' +
-'    rgba[3] = 1.0;                                                   \n' +
-'                                                                     \n' +
-'    return rgba;                                                     \n' +
-'}                                                                    \n' +
-
-'vec2 cMult(vec2 z1, vec2 z2)                                         \n' +
-'{                                                                    \n' +
-'    return vec2(z1.x * z2.x - z1.y * z2.y,                           \n' +
-'                z1.x * z2.y + z1.y * z2.x);                          \n' +
-'}                                                                    \n' +
-
-'vec2 cDiv(vec2 z1, vec2 z2)                                          \n' +
-'{                                                                    \n' +
-'    float z2Mag2 = dot(z2, z2);                                      \n' +
-'    return vec2(dot(z1, z2),                                         \n' +
-'                z1.y * z2.x - z1.x * z2.y) / z2Mag2;                 \n' +
-'}                                                                    \n' +
-
-'vec2 cExp(vec2 z)                                                    \n' +
-'{                                                                    \n' +
-'    float rFact = pow(M_E, z.x);                                     \n' +
-'    vec2 cFact = vec2(cos(z.y), sin(z.y));                           \n' +
-'    return rFact * cFact;                                            \n' +
-'}                                                                    \n' +
-
-'vec2 cArg(vec2 z)                                                    \n' +
-'{                                                                    \n' +
-'    return vec2(atan(z.y, z.x), 0.0);                                \n' +
-'}                                                                    \n' +
-
-'vec2 cSin(vec2 z)                                                    \n' +
-'{                                                                    \n' +
-'    float eTozy = pow(M_E, z.y);                                     \n' +
-'    float eToNegzy = pow(M_E, -z.y);                                 \n' +
-'    return vec2(sin(z.x) * (eTozy + eToNegzy),                       \n' +
-'                cos(z.x) * (eTozy - eToNegzy)) / 2.0;                \n' +
-'}                                                                    \n' +
-
-'vec2 cCos(vec2 z)                                                    \n' +
-'{                                                                    \n' +
-'    float eTozy = pow(M_E, z.y);                                     \n' +
-'    float eToNegzy = pow(M_E, -z.y);                                 \n' +
-'    return vec2(cos(z.x) * (eTozy + eToNegzy),                       \n' +
-'                -1.0 * sin(z.x) * (eTozy - eToNegzy)) / 2.0;         \n' +
-'}                                                                    \n' +
-
-'vec2 cSinh(vec2 z)                                                   \n' +
-'{                                                                    \n' +
-'    return (cExp(z) - cExp(-z)) / 2.0;                               \n' +
-'}                                                                    \n' +
-    
-'vec2 cCosh(vec2 z)                                                   \n' +
-'{                                                                    \n' +
-'    return (cExp(z) + cExp(-z)) / 2.0;                               \n' +
-'}                                                                    \n' +
-    
-'vec2 cTan(vec2 z)                                                    \n' +
-'{                                                                    \n' +
-'    return cDiv(cSin(z), cCos(z));                                   \n' +
-'}                                                                    \n' +
-
-'vec2 cLog(vec2 z)                                                    \n' +
-'{                                                                    \n' +
-'    return vec2(log(sqrt(dot(z, z))),                                \n' +
-'                cArg(z).x);                                          \n' +
-'}                                                                    \n' +
-
-'vec2 cPow(vec2 z, vec2 c)                                            \n' +
-'{                                                                    \n' +
-'    return cExp(cMult(c, cLog(z)));                                  \n' +
-'}                                                                    \n' +
-
-'vec2 cMag(vec2 z)                                                    \n' +
-'{                                                                    \n' +
-'    return vec2(sqrt(dot(z, z)), 0.0);                               \n' +
-'}                                                                    \n' +
-
-'vec2 cRe(vec2 z)                                                     \n' +
-'{                                                                    \n' +
-'    return vec2(z.x, 0.0);                                           \n' +
-'}                                                                    \n' +
-
-'vec2 cIm(vec2 z)                                                     \n' +
-'{                                                                    \n' +
-'    return vec2(z.y, 0.0);                                           \n' +
-'}                                                                    \n' +
-
-// Gamma implementation based on Lanczos approximation. Adapted from
-// python code in Wikipedia entry on Lanczos.
-'vec2 cGamma(vec2 z)                                                    \n' +
-'{                                                                      \n' +
-'    float p[9];                                                        \n' +
-'    p[0] = 0.99999999999980993;                                        \n' +
-'    p[1] = 676.5203681218851;                                          \n' +
-'    p[2] = -1259.1392167224028;                                        \n' +
-'    p[3] = 771.32342877765313;                                         \n' +
-'    p[4] = -176.61502916214059;                                        \n' +
-'    p[5] = 12.507343278686905;                                         \n' +
-'    p[6] = -0.13857109526572012;                                       \n' +
-'    p[7] = 9.9843695780195716e-6;                                      \n' +
-'    p[8] = 1.5056327351493116e-7;                                      \n' +
-    
-'    bool reflected = false;                                            \n' +
-'    vec2 origZ = z;                                                    \n' +
-'    if (z.x < 0.5)                                                     \n' +
-'    {                                                                  \n' +
-'        z = vec2(1.0, 0.0) - z;                                        \n' +
-'        reflected = true;                                              \n' +
-'    }                                                                  \n' +
-    
-'    z -= vec2(1.0, 0.0);                                               \n' +
-    
-'    vec2 x = vec2(p[0], 0.0);                                          \n' +
-'    for (int i = 1; i < 9; i++)                                        \n' +
-'    {                                                                  \n' +
-'        x += cDiv(vec2(p[i], 0.0), z + vec2(float(i), 0.0));           \n' +
-'    }                                                                  \n' +
-    
-'    vec2 t = z + vec2(7.5, 0.0);                                       \n' +
-'    vec2 result = cMult(cMult(sqrt(2.0 * M_PI) * cPow(t, z + vec2(0.5, 0.0)), cExp(-t)), x); \n' +
-    
-'    if (!reflected)                                                    \n' +
-'        return result;                                                 \n' +
-'    else                                                               \n' +
-'        return cDiv(vec2(M_PI, 0.0), cMult(cSin(M_PI * origZ), result));                \n' +
-'}                                                                    \n' +
-
-'void main()                                                          \n' +
-'{                                                                    \n' +
-'    vec2 z = vec2((gl_FragCoord.x + u_offsetX) / u_width - 0.5,                          \n' +
-'                  (u_height/u_width) * (0.5 - (gl_FragCoord.y - u_offsetY) / u_height)); \n' +
-'                                                                     \n' +
-'    z /= u_zoom / 30.0;                                              \n' +
-'                                                                     \n' +
-'                                                                     \n' +
-'    vec2 z_n = vec2(0.0, 0.0);                                       \n' +
-'    for (int i = 0; i < {iteration_count}; i++)                      \n' +
-'        z_n = {js_generated_expr};                                   \n' +
-'                                                                     \n' +
-'    gl_FragColor = getRgbaByArg(z_n);                                  \n' +
-'}                                                                    \n' +
-'                                                                     \n';
-    
-    var parser = null;
-    var dragging = false;
-    var dragStart = { x: 0, y: 0 };
-    var iterations = 1;
+    let parser = null;
+    let dragging = false;
+    let dragStart = { x: 0, y: 0 };
+    let iterations = 1;
     
     // WebGL pointers to shader variables
-    var a_Position = 0;
-    var u_width = 0;
-    var u_height = 0;
-    var u_zoom = 0;
-    var u_offsetX = 0;
-    var u_offsetY = 0;
-    var u_paramA = 0;
+    let a_Position = 0;
+    let u_width = 0;
+    let u_height = 0;
+    let u_zoom = 0;
+    let u_offsetX = 0;
+    let u_offsetY = 0;
+    // let u_paramA = 0;
     
-    var gl = {};
+    let gl = {};
     
     // Amount to offset view window from origin-centered, in
     // canvas pixels.
-    var offsetX = 0.0;
-    var offsetY = 0.0;
+    let offsetX = 0.0;
+    let offsetY = 0.0;
     
-    var zoom = 1.0;
+    let zoom = 1.0;
     
-    var currExpr = '';
-    var currShaderExpr = '';
+    let currExpr = '';
+    let currShaderExpr = '';
 
     function mouseUp(event) {
         dragging = false;
@@ -356,13 +353,16 @@ var FSHADER_SOURCE =
 
     }
 
+    function getShaderSource(expression) {
+        return FSHADER_SOURCE.replace('{js_generated_expr}', expression)
+                             .replace('{iteration_count}', iterations);
+    }
+
     function updateShader() {
         
-        var shaderTxt =
-            FSHADER_SOURCE.replace('{js_generated_expr}', currShaderExpr.str)
-                          .replace('{iteration_count}', iterations);
+        const shaderSrc = getShaderSource(currShaderExpr.str);
         
-        if (!initShaders(gl, VSHADER_SOURCE, shaderTxt)) {
+        if (!initShaders(gl, VSHADER_SOURCE, shaderSrc)) {
             console.log('Failed to intialize shaders.');
         }
         
@@ -417,12 +417,12 @@ var FSHADER_SOURCE =
     }
 
     function getStdFuncExpr(ast) {
-        var shaderFuncName = 'c' + ast.name.charAt(0).toUpperCase() + ast.name.slice(1);
+        const shaderFuncName = 'c' + ast.name.charAt(0).toUpperCase() + ast.name.slice(1);
         
-        var paramsString = '';
-        var usedParams = [];
+        let paramsString = '';
+        let usedParams = [];
         
-        var first = true;
+        let first = true;
         for (var paramIdx in ast.params) {
             var paramExpr = astToShaderExpr(ast.params[paramIdx]);
             
@@ -446,11 +446,8 @@ var FSHADER_SOURCE =
 
     function draw() {
         gl.clearColor(0, 0, 0, 1.0);
-        
         gl.clear(gl.COLOR_BUFFER_BIT);
-        
         gl.drawArrays(gl.TRIANGLES, 0, 6);
-        
     }
 
     function initVertexBuffers() {
@@ -485,14 +482,14 @@ var FSHADER_SOURCE =
         u_offsetX = getLocation('u_offsetX');
         u_offsetY = getLocation('u_offsetY');
         u_zoom = getLocation('u_zoom');
-        u_paramA = getLocation('u_paramA');
+//        u_paramA = getLocation('u_paramA');
         
         gl.uniform1f(u_width, canvas.clientWidth);
         gl.uniform1f(u_height, canvas.clientHeight);
         gl.uniform1f(u_offsetX, offsetX);
         gl.uniform1f(u_offsetY, offsetY);
         gl.uniform1f(u_zoom, zoom);
-        gl.uniform2f(u_paramA, 0.0, 0.0);
+//        gl.uniform2f(u_paramA, 0.0, 0.0);
         
         // Enable the generic vertex attribute array
         gl.enableVertexAttribArray(a_Position);
@@ -502,7 +499,7 @@ var FSHADER_SOURCE =
     }
 
     function getLocation(varName) {
-        var offset = gl.getUniformLocation(gl.program, varName);
+        const offset = gl.getUniformLocation(gl.program, varName);
         
         if (!offset)
             throw 'Failed to get the storage location of ' + varName;
@@ -512,9 +509,9 @@ var FSHADER_SOURCE =
     
     jQuery.get('grammar.txt', function(data) { grammarReady(data); });
     
-    gl = getWebGLContext(canvas, { antialias: true });
+    gl = canvas.getContext("webgl");
     if (!gl) {
-        console.log('Failed to get the rendering context for WebGL');
+        alert('Failed to get the rendering context for WebGL');
         return;
     }
     
@@ -533,11 +530,12 @@ var FSHADER_SOURCE =
     // Prevent change to text-selection "i-beam" cursor on mouse down.
     canvas.onselectstart = function() { return false; }
         
-    if (!initShaders(gl, VSHADER_SOURCE, FSHADER_SOURCE.replace('{js_generated_expr}', 'z'))) {
+    const shaderSrc =  getShaderSource('z');
+    if (!initShaders(gl, VSHADER_SOURCE, shaderSrc)) {
         console.log('Failed to intialize shaders.');
     }
     
-    var paramWidgetA = new COMPLOT.ParamWidget($(hostElem).find('#sidebar'));
+    const paramWidgetA = new COMPLOT.ParamWidget($(hostElem).find('#sidebar'));
     paramWidgetA.onChange(paramChange);
     
     plotAreaResize();
