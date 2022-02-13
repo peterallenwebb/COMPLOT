@@ -1,4 +1,2 @@
-COMPLOT
-=======
+## COMPLOT: A WebGL Based Visualizer for Complex Functions
 
-WebGL Based Complex Function Visualization
