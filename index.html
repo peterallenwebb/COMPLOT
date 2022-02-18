@@ -1,8 +1,59 @@
-<!DOCTYPE html>
+<doctype html>
 <html>
-  <head>
-  </head>
-  <body>
-  Test.
-  </body>
+<head>
+    <title>COMPLOT</title>
+    <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96">
+    <link rel="icon" type="image/png" href="/favicon-32x32.png" sizes="32x32">
+    <link rel="icon" type="image/png" href="/favicon-16x16.png" sizes="16x16">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <link href="COMPLOT.css" rel="stylesheet" />
+</head>
+<body onload="createCOMPLOT()">
+    <div id="plotArea">
+        <canvas id="webgl">
+            COMPLOT requires a browser that supports the canvas tag.
+        </canvas>
+        <div id="sidebar">
+            <div id="formulaArea">
+                <span id="funcLabel">f(z) = </span>
+                <input type="text" id="expr" name="expr" />
+                <output id="parseStatus" class="unknown"></output>
+            </div>
+            <div>Iterate n=<input type="number" id="iterations" name="iterations" min="1" max="20"> times</div>
+            <div>Shading: 
+                <select>
+                    <option value="none">None</option>
+                    <option value="radial">Radial</option>
+                    <option value="concentric">Concentric</option>
+                    <option value="polar_check">Polar Check</option>
+                    <option value="horizontal">Horizontal</option>    
+                    <option value="vertical">Vertical</option>
+                    <option value="check">Check</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    
+    <div id="debugArea">
+        <textarea id="ast"></textarea>
+        <textarea id="shaderExpression"></textarea>
+    </div>
+    
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+    <script src="lib\jquery.mousewheel.js"></script>
+    <script src="lib\webgl-utils.js"></script>
+    <script src="lib\webgl-debug.js"></script>
+    <script src="lib\cuon-utils.js"></script>
+    <script src="lib\peg-0.8.0.min.js"></script>
+    <script src="COMPLOT.js"></script>
+    <script src="param_widget.js"></script>
+    <script type="text/javascript">
+        
+        function createCOMPLOT() {
+            var c = new COMPLOT(document.getElementById('webgl'),
+                                document.getElementById('plotArea'));
+        }
+    
+    </script>
+</body>
 </html>
