@@ -1,3 +1,5 @@
+// TODO: exponents aren't workng on the iteration variable?
+
 function COMPLOT(canvas, hostElem) {
 
     // Inelegantly include the WebGL vertex shader source code as a sting...
@@ -18,7 +20,7 @@ function COMPLOT(canvas, hostElem) {
     'uniform float u_offsetX;                                             \n' +
     'uniform float u_offsetY;                                             \n' +
     'uniform float u_zoom;                                                \n' +
-//    'uniform vec2 u_paramA;                                              \n' +
+    'uniform vec2 u_paramA;                                               \n' +
     '\n' +
     'vec4 getRgbaByArg(vec2 c)                                            \n' +
     '{                                                                    \n' +
@@ -180,7 +182,7 @@ function COMPLOT(canvas, hostElem) {
     '    for (int i = 0; i < {iteration_count}; i++)                      \n' +
     '        z_n = {js_generated_expr};                                   \n' +
     '                                                                     \n' +
-    '    gl_FragColor = getRgbaByArg(z_n);                                  \n' +
+    '    gl_FragColor = getRgbaByArg(z_n);                                \n' +
     '}                                                                    \n' +
     '                                                                     \n';
     
@@ -482,14 +484,14 @@ function COMPLOT(canvas, hostElem) {
         u_offsetX = getLocation('u_offsetX');
         u_offsetY = getLocation('u_offsetY');
         u_zoom = getLocation('u_zoom');
-//        u_paramA = getLocation('u_paramA');
+        u_paramA = getLocation('u_paramA', false);
         
         gl.uniform1f(u_width, canvas.clientWidth);
         gl.uniform1f(u_height, canvas.clientHeight);
         gl.uniform1f(u_offsetX, offsetX);
         gl.uniform1f(u_offsetY, offsetY);
         gl.uniform1f(u_zoom, zoom);
-//        gl.uniform2f(u_paramA, 0.0, 0.0);
+        gl.uniform2f(u_paramA, 0.0, 0.0);
         
         // Enable the generic vertex attribute array
         gl.enableVertexAttribArray(a_Position);
@@ -498,10 +500,10 @@ function COMPLOT(canvas, hostElem) {
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
     }
 
-    function getLocation(varName) {
+    function getLocation(varName, throwOnFail = true) {
         const offset = gl.getUniformLocation(gl.program, varName);
         
-        if (!offset)
+        if (!offset && throwOnFail)
             throw 'Failed to get the storage location of ' + varName;
         
         return offset;
