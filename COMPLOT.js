@@ -3,7 +3,7 @@
 function COMPLOT(canvas, hostElem) {
 
     // Inelegantly include the WebGL vertex shader source code as a sting...
-    var VSHADER_SOURCE =
+    const VSHADER_SOURCE =
     'attribute vec4 a_Position;                                           \n' +
     'void main()                                                          \n' +
     '{                                                                    \n' +
@@ -11,7 +11,7 @@ function COMPLOT(canvas, hostElem) {
     '}                                                                    \n';
 
     // ...and do the same for the much more interesting fragment shader.
-    var FSHADER_SOURCE =
+    const FSHADER_SOURCE =
     '#define M_PI 3.1415926535897932384626433832795                       \n' +
     '#define M_E  2.71828182845904523536028747135266                      \n' +
     'precision highp float;                                               \n' +
@@ -43,7 +43,7 @@ function COMPLOT(canvas, hostElem) {
     '    float iFloor = c.y - mod(c.y, 1.0);                              \n' +
     '                                                                     \n' +
     '    if (mod(rFloor + iFloor, 2.0) == 0.0)                            \n' +
-    '        rgba *= 0.8;                                                 \n' +
+    '        rgba *= 1.0 - mod(-c.x, 1.0)*0.08 - mod(c.y, 1.0)*0.08;                                                 \n' +
     '                                                                     \n' +
     '    rgba[3] = 1.0;                                                   \n' +
     '                                                                     \n' +
@@ -242,7 +242,7 @@ function COMPLOT(canvas, hostElem) {
         canvas.width = $('#plotArea').width();
         canvas.height = $('#plotArea').height();
         
-        var n = initVertexBuffers();
+        const n = initVertexBuffers();
         if (n < 0) {
             console.log('Failed to set the positions of the vertices');
             return;
@@ -253,7 +253,7 @@ function COMPLOT(canvas, hostElem) {
 
     function mouseWheel(event) {
         
-        var zoomFactor = 1.0;
+        let zoomFactor = 1.0;
         
         if (event.deltaY > 0)
             zoomFactor *= 1.03;
@@ -285,17 +285,19 @@ function COMPLOT(canvas, hostElem) {
     function grammarReady(grammar) {
         parser = PEG.buildParser(grammar);
         
-        var hash = window.location.hash;
+        const hash = window.location.hash;
         if (hash.length > 0) {
-            var expr = decodeURIComponent(hash.substring(1));
+            const splits = hash.substring(1).split('#');
+            const expr = decodeURIComponent(splits[0]);
+            iterations = splits[1] || 1;
+            $('#iterations').val(iterations);
             $('#expr').val(expr);
             updateExpr(expr);
         }
     }
 
     function exprChange(event) {
-        
-        var newExpr = $(this).val().replace(/\s/g, '');
+        const newExpr = $(this).val().replace(/\s/g, '');
         
         if (newExpr === currExpr) {
             return;
@@ -307,6 +309,7 @@ function COMPLOT(canvas, hostElem) {
     function iterationsChange(event) {
         iterations = Number($(this).val());
         updateShader();
+        updateUrl();
     }
     
     function paramChange(newVal) {
@@ -324,10 +327,10 @@ function COMPLOT(canvas, hostElem) {
         if (parser) {
             
             try {
-                var parsedExprAst = parser.parse(newExpr);
+                const parsedExprAst = parser.parse(newExpr);
                 $('#ast').val(JSON.stringify(parsedExprAst));
                 
-                var shaderExpr = astToShaderExpr(parsedExprAst);
+                const shaderExpr = astToShaderExpr(parsedExprAst);
                 $('#shaderExpression').val(JSON.stringify(shaderExpr));
                 
                 offsetX = 0.0;
@@ -336,9 +339,7 @@ function COMPLOT(canvas, hostElem) {
                 
                 currShaderExpr = shaderExpr;
                 updateShader();
-                
-                var uriExpr = encodeURIComponent(currExpr);
-                window.location = '#' + uriExpr
+                updateUrl();
             }
             catch (exp) {
                 console.log(exp);
@@ -352,7 +353,11 @@ function COMPLOT(canvas, hostElem) {
         else {
             $('#parseStatus').addClass('unknown');
         }
+    }
 
+    function updateUrl() {
+        const uriExpr = encodeURIComponent(currExpr);
+        window.location = '#' + uriExpr + '#' + iterations;
     }
 
     function getShaderSource(expression) {
@@ -403,7 +408,7 @@ function COMPLOT(canvas, hostElem) {
         } else if (ast.type === 'func') {
             
             if (ast.name === 'add' || ast.name === 'sub') {
-                var op = ast.name === 'add' ? '+' : '-';
+                const op = ast.name === 'add' ? '+' : '-';
                 var leftExpr = astToShaderExpr(ast.params[0]);
                 var rightExpr = astToShaderExpr(ast.params[1])
                 var sumStr = '(' +  leftExpr.str + op +  rightExpr.str + ')';
