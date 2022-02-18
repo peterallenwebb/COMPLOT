@@ -42,13 +42,13 @@ pow
 primary
 = decimal
 / int
+/ funcapp
 / symbol
 / "(" _ additive:additive _ ")" { return additive; }
 / "|" _ additive:additive _ "|" { return { type:"func", name:"mag", params: [ additive ] }; }
-/ funcapp;
 
 symbol "symbol"
-= symbol:("e" / "i" / "pi" / "z" / [A-Z]) { return { type: "symbol", name: symbol }; }
+= symbol:("e" / "i" / "pi" / "z_n" / "z" / [A-Z]) { return { type: "symbol", name: symbol }; }
 
 decimal "decimal"
 = int:int "." uint:uint { return { type: "number", intPart: int.intPart, fracPart: uint.intPart}; }
@@ -60,5 +60,5 @@ uint "uint"
 = digits:[0-9]+ { return { type: "number", intPart: parseInt(digits.join("")), fracPart: 0}; }
 
 funcapp "funcapp"
-= funcName:("re" / "im" / "arg" / "sin" / "cos" / "tan" / "log" / "gamma") _ "(" _ additive:additive _ ")"
+= funcName:("re" / "im" / "arg" / "sinh" / "cosh" / "sin" / "cos" / "tan" / "log" / "gamma") _ "(" _ additive:additive _ ")"
 { return { type: "func", name: funcName, params: [ additive ] } }
