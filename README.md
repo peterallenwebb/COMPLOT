@@ -4,7 +4,8 @@ COMPLOT allows the user to interact with phase portraits of complex functions, a
 
 When the user enters a function, it is instantly translated into a WebGL shader and compiled, enabling ultra-smooth panning and zooming.
 
-See it live on GitHub Pages: 
-https://peterallenwebb.github.io/COMPLOT/#(z%2F2)%5E3%2B(z%2F3)%5E2-4*z#1
-https://peterallenwebb.github.io/COMPLOT/#sin(z)
-https://peterallenwebb.github.io/COMPLOT/#sin(z)%2Fcos(z)#1
+See it live on GitHub Pages:
+
+* https://peterallenwebb.github.io/COMPLOT/#(z%2F2)%5E3%2B(z%2F3)%5E2-4*z#1
+* https://peterallenwebb.github.io/COMPLOT/#sin(z)
+* https://peterallenwebb.github.io/COMPLOT/#sin(z)%2Fcos(z)#1
