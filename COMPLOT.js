@@ -20,7 +20,6 @@ function COMPLOT(canvas, hostElem) {
     'uniform float u_offsetX;                                             \n' +
     'uniform float u_offsetY;                                             \n' +
     'uniform float u_zoom;                                                \n' +
-    'uniform vec2 u_paramA;                                               \n' +
     '\n' +
     'vec4 getRgbaByArg(vec2 c)                                            \n' +
     '{                                                                    \n' +
@@ -198,7 +197,6 @@ function COMPLOT(canvas, hostElem) {
     let u_zoom = 0;
     let u_offsetX = 0;
     let u_offsetY = 0;
-    // let u_paramA = 0;
     
     let gl = {};
     
@@ -305,17 +303,6 @@ function COMPLOT(canvas, hostElem) {
         
         updateExpr(newExpr);
     }
-    
-    function iterationsChange(event) {
-        iterations = Number($(this).val());
-        updateShader();
-        updateUrl();
-    }
-    
-    function paramChange(newVal) {
-        gl.uniform2f(u_paramA, newVal.real, newVal.img);
-        draw();
-    }
 
     function updateExpr(newExpr) {
         
@@ -394,8 +381,6 @@ function COMPLOT(canvas, hostElem) {
                     return { str: 'z' };
                 case 'z_n':
                     return { str: 'z_n' };
-                case 'A':
-                    return { str: 'u_paramA' };
                 case 'e':
                     return { str: 'vec2(M_E, 0.0)' };
                 case 'pi':
@@ -489,14 +474,12 @@ function COMPLOT(canvas, hostElem) {
         u_offsetX = getLocation('u_offsetX');
         u_offsetY = getLocation('u_offsetY');
         u_zoom = getLocation('u_zoom');
-        u_paramA = getLocation('u_paramA', false);
         
         gl.uniform1f(u_width, canvas.clientWidth);
         gl.uniform1f(u_height, canvas.clientHeight);
         gl.uniform1f(u_offsetX, offsetX);
         gl.uniform1f(u_offsetY, offsetY);
         gl.uniform1f(u_zoom, zoom);
-        gl.uniform2f(u_paramA, 0.0, 0.0);
         
         // Enable the generic vertex attribute array
         gl.enableVertexAttribArray(a_Position);
@@ -531,9 +514,6 @@ function COMPLOT(canvas, hostElem) {
         
     $(window).resize(plotAreaResize);
     
-    $('#iterations').val(iterations);
-    $('#iterations').on('change keyup paste', iterationsChange);
-    
     // Prevent change to text-selection "i-beam" cursor on mouse down.
     canvas.onselectstart = function() { return false; }
         
@@ -541,9 +521,6 @@ function COMPLOT(canvas, hostElem) {
     if (!initShaders(gl, VSHADER_SOURCE, shaderSrc)) {
         console.log('Failed to intialize shaders.');
     }
-    
-    const paramWidgetA = new COMPLOT.ParamWidget($(hostElem).find('#sidebar'));
-    paramWidgetA.onChange(paramChange);
     
     plotAreaResize();
 }
